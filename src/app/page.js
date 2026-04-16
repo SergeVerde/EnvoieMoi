@@ -191,7 +191,7 @@ export default function Home() {
     <div className="max-w-md mx-auto min-h-screen relative pb-20">
       {/* Header */}
       <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-        <h1 className="font-display text-2xl font-extrabold gradient-text">Рецептник</h1>
+        <h1 className="font-display text-2xl font-extrabold gradient-text">moimi</h1>
       </div>
 
       {/* Search */}
