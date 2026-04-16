@@ -47,7 +47,7 @@ export default function AuthScreen({ supabase }) {
             <strong>{email}</strong>
           </p>
           <p className="text-gray-400 text-xs mb-6">
-            Нажми на ссылку в письме — ты автоматически войдёшь в приложение
+            Подтверди регистрацию по ссылке в письме
           </p>
           <button
             onClick={() => { setCheckEmail(false); setIsSignUp(false); }}
@@ -64,8 +64,8 @@ export default function AuthScreen({ supabase }) {
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
       <div className="text-center w-full">
         <div className="text-6xl mb-6">👨‍🍳</div>
-        <h1 className="font-display text-3xl font-extrabold gradient-text mb-2">Рецептник</h1>
-        <p className="text-gray-500 mb-8">Социальная сеть рецептов</p>
+        <h1 className="font-display text-3xl font-extrabold gradient-text mb-2">moimi</h1>
+        <p className="text-gray-500 mb-8">Покажи свой рецепт миру!</p>
 
         <div className="max-w-xs mx-auto space-y-3">
           <input
