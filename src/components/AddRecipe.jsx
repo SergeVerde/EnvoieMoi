@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { t, UNITS } from '@/lib/i18n';
+import { useState, useRef, useEffect } from 'react';
+import { t, UNITS, DISH_TYPES, MEAL_TIMES } from '@/lib/i18n';
 import { resizeImage, fileToBase64 } from '@/lib/image';
 
-export default function AddRecipe({ supabase, user, profile, lang, recipeLang, canAdd, onPublished, onBack }) {
-  const [mode, setMode] = useState('ai'); // ai | manual | preview
+export default function AddRecipe({ supabase, user, profile, lang, recipeLang, canAdd, editRecipe = null, onPublished, onBack }) {
+  const isEdit = !!editRecipe;
+  const [mode, setMode] = useState(isEdit ? 'manual' : 'ai');
   const [raw, setRaw] = useState('');
   const [busy, setBusy] = useState(false);
   const [bMsg, setBMsg] = useState('');
   const [err, setErr] = useState('');
   const [prev, setPrev] = useState(null);
+  const abortRef = useRef(null);
 
   // Manual fields
   const [mT, setMT] = useState('');
+  const [mDesc, setMDesc] = useState('');
   const [mI, setMI] = useState([{ name: '', amount: '', unit: 'шт' }]);
   const [mS, setMS] = useState(['']);
   const [mTips, setMTips] = useState('');
@@ -22,31 +25,61 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   const [mCal, setMCal] = useState('');
   const [mCalP, setMCalP] = useState('serving');
   const [mServ, setMServ] = useState('4');
+  const [mTags, setMTags] = useState('');
+  const [mDishType, setMDishType] = useState('');
+  const [mMealTime, setMMealTime] = useState('');
 
   // Photos
-  const [photos, setPhotos] = useState([]); // [{blob, url, main}]
-  const [ocrImgs, setOcrImgs] = useState([]); // base64 strings
+  const [photos, setPhotos] = useState([]);
+  const [ocrImgs, setOcrImgs] = useState([]);
   const fRef = useRef(null);
   const oRef = useRef(null);
 
-  // AI parse
+  useEffect(() => {
+    if (editRecipe) {
+      setMT(editRecipe.title || '');
+      setMDesc(editRecipe.description || '');
+      setMI(editRecipe.ingredients?.length > 0
+        ? editRecipe.ingredients.map(x => ({ name: x.name || '', amount: String(x.amount || ''), unit: x.unit || 'шт' }))
+        : [{ name: '', amount: '', unit: 'шт' }]);
+      setMS(editRecipe.steps?.length > 0 ? editRecipe.steps.map(x => x.content || '') : ['']);
+      setMTips(editRecipe.tips || '');
+      setMPrep(editRecipe.prep_time || '');
+      setMCook(editRecipe.cook_time || '');
+      setMCal(editRecipe.calories ? String(editRecipe.calories) : '');
+      setMCalP(editRecipe.calories_per || 'serving');
+      setMServ(String(editRecipe.servings || 4));
+      setMTags((editRecipe.tags || []).join(', '));
+      setMDishType(editRecipe.dish_type || '');
+      setMMealTime(editRecipe.meal_time || '');
+    }
+  }, []);
+
+  function cancelRequest() {
+    abortRef.current?.abort();
+    setBusy(false); setBMsg(''); setErr('');
+  }
+
   async function doParse() {
     if (!raw.trim()) return;
+    abortRef.current = new AbortController();
     setBusy(true); setBMsg(t(lang, 'parsing')); setErr('');
     try {
       const res = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: raw, lang: recipeLang }),
+        signal: abortRef.current.signal,
       });
       const data = await res.json();
-      if (data.error) { setErr(t(lang, 'parseFail')); }
+      if (data.error) setErr(t(lang, 'parseFail'));
       else { setPrev(data); setMode('preview'); }
-    } catch { setErr(t(lang, 'parseFail')); }
+    } catch (e) {
+      if (e.name !== 'AbortError') setErr(t(lang, 'parseFail'));
+    }
     setBusy(false); setBMsg('');
   }
 
-  // OCR
   async function addOcrImg(e) {
     const files = [...(e.target.files || [])];
     if (ocrImgs.length + files.length > 2) { e.target.value = ''; return; }
@@ -58,21 +91,24 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
   async function doOcr() {
     if (!ocrImgs.length) return;
+    abortRef.current = new AbortController();
     setBusy(true); setBMsg(t(lang, 'ocrParsing')); setErr('');
     try {
       const res = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images: ocrImgs, lang: recipeLang }),
+        signal: abortRef.current.signal,
       });
       const data = await res.json();
-      if (data.error) { setErr(t(lang, 'parseFail')); }
+      if (data.error) setErr(t(lang, 'parseFail'));
       else { setPrev(data); setOcrImgs([]); setMode('preview'); }
-    } catch { setErr(t(lang, 'parseFail')); }
+    } catch (e) {
+      if (e.name !== 'AbortError') setErr(t(lang, 'parseFail'));
+    }
     setBusy(false); setBMsg('');
   }
 
-  // Photos for dish
   async function addPhotos(e) {
     const files = [...(e.target.files || [])];
     if (photos.length + files.length > 5) { e.target.value = ''; return; }
@@ -87,28 +123,30 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
     e.target.value = '';
   }
 
-  // Manual submit
   function doManual() {
     if (!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => x.trim())) return;
     setPrev({
-      title: mT.trim(), description: '', servings: parseInt(mServ) || 4,
+      id: editRecipe?.id,
+      title: mT.trim(),
+      description: mDesc.trim(),
+      servings: parseInt(mServ) || 4,
       cook_time: mCook, prep_time: mPrep,
       calories: mCal ? parseInt(mCal) : null, calories_per: mCalP,
-      tags: [], tips: mTips,
+      tags: mTags.split(',').map(s => s.trim()).filter(Boolean),
+      tips: mTips,
+      dish_type: mDishType || null,
+      meal_time: mMealTime || null,
       ingredients: mI.filter(x => x.name.trim()).map(x => ({ name: x.name.trim(), amount: parseFloat(x.amount) || 0, unit: x.unit })),
       steps: mS.filter(x => x.trim()).map(x => ({ title: '', content: x.trim(), timer_seconds: null })),
     });
     setMode('preview');
   }
 
-  // Publish
   async function publish() {
     if (!prev) return;
     setBusy(true); setBMsg(t(lang, 'publish') + '...');
 
-    // Insert recipe
-    const { data: recipe, error } = await supabase.from('recipes').insert({
-      user_id: user.id,
+    const recipeData = {
       title: prev.title,
       description: prev.description || '',
       servings: prev.servings || 4,
@@ -120,24 +158,36 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       steps: prev.steps,
       tags: prev.tags || [],
       tips: prev.tips || '',
-      lang: recipeLang,
-    }).select().single();
+      dish_type: prev.dish_type || null,
+      meal_time: prev.meal_time || null,
+    };
 
-    if (error || !recipe) { setBusy(false); setBMsg(''); return; }
+    if (prev.id) {
+      await supabase.from('recipes').update(recipeData).eq('id', prev.id);
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i];
+        const path = `${user.id}/${prev.id}/${Date.now()}_${i}.jpg`;
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
+          await supabase.from('recipe_photos').insert({ recipe_id: prev.id, url: publicUrl, is_main: false, sort_order: 99 });
+        }
+      }
+    } else {
+      const { data: recipe, error } = await supabase.from('recipes').insert({
+        user_id: user.id, ...recipeData, lang: recipeLang,
+      }).select().single();
 
-    // Upload photos
-    for (let i = 0; i < photos.length; i++) {
-      const p = photos[i];
-      const path = `${user.id}/${recipe.id}/${Date.now()}_${i}.jpg`;
-      const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
-      if (!upErr) {
-        const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
-        await supabase.from('recipe_photos').insert({
-          recipe_id: recipe.id,
-          url: publicUrl,
-          is_main: p.main,
-          sort_order: i,
-        });
+      if (error || !recipe) { setBusy(false); setBMsg(''); return; }
+
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i];
+        const path = `${user.id}/${recipe.id}/${Date.now()}_${i}.jpg`;
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
+          await supabase.from('recipe_photos').insert({ recipe_id: recipe.id, url: publicUrl, is_main: p.main, sort_order: i });
+        }
       }
     }
 
@@ -162,7 +212,9 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h1 className="font-display text-xl font-extrabold gradient-text">{t(lang, 'addRecipe')}</h1>
+        <h1 className="font-display text-xl font-extrabold gradient-text">
+          {isEdit ? t(lang, 'editRecipe') : t(lang, 'addRecipe')}
+        </h1>
         <div className="w-10" />
       </div>
 
@@ -190,7 +242,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             )}
             <div className="flex gap-2">
               {ocrImgs.length < 2 && <button className="flex-1 py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500" onClick={() => oRef.current?.click()}>📷 {t(lang, 'addPh')}</button>}
-              {ocrImgs.length > 0 && <button className="flex-1 py-2 gradient-btn text-white rounded-xl text-xs font-bold" onClick={doOcr} disabled={busy}>✨ {t(lang, 'ocrBtn')}</button>}
+              {ocrImgs.length > 0 && !busy && <button className="flex-1 py-2 gradient-btn text-white rounded-xl text-xs font-bold" onClick={doOcr}>✨ {t(lang, 'ocrBtn')}</button>}
             </div>
           </div>
 
@@ -207,6 +259,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             <div className="flex flex-col items-center py-8 gap-3">
               <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
               <span className="text-sm text-gray-500 font-semibold">{bMsg}</span>
+              <button className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 bg-white" onClick={cancelRequest}>{t(lang, 'cancelParse')}</button>
             </div>
           ) : (
             <>
@@ -217,10 +270,24 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         </>}
 
         {mode === 'manual' && <>
-          <div className="text-center mb-4"><div className="text-4xl mb-2">📝</div></div>
+          <div className="text-center mb-4"><div className="text-4xl mb-2">{isEdit ? '✏️' : '📝'}</div></div>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'titleLabel')}</label>
           <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mT} onChange={e => setMT(e.target.value)} />
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dishType')}</label>
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {DISH_TYPES.map(dt => (
+              <button key={dt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDishType === dt ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMDishType(mDishType === dt ? '' : dt)}>{dt}</button>
+            ))}
+          </div>
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'mealTime')}</label>
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {MEAL_TIMES.map(mt => (
+              <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTime === mt ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMMealTime(mMealTime === mt ? '' : mt)}>{mt}</button>
+            ))}
+          </div>
 
           <div className="mb-3 space-y-2">
             <div className="flex gap-2 items-center"><span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'servings')}</span><input className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" type="number" min="1" value={mServ} onChange={e => setMServ(e.target.value)} /></div>
@@ -256,10 +323,13 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <button className="w-full py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500 mb-4" onClick={() => setMS([...mS, ''])}>{t(lang, 'addStep')}</button>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'tips')}</label>
-          <textarea className="w-full min-h-[80px] p-3 border border-gray-200 rounded-2xl text-sm outline-none bg-white resize-y mb-4" value={mTips} onChange={e => setMTips(e.target.value)} placeholder={t(lang, 'tipsP')} />
+          <textarea className="w-full min-h-[80px] p-3 border border-gray-200 rounded-2xl text-sm outline-none bg-white resize-y mb-3" value={mTips} onChange={e => setMTips(e.target.value)} placeholder={t(lang, 'tipsP')} />
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">Теги (через запятую)</label>
+          <input className="w-full mb-4 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
 
           <button className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50" disabled={!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => x.trim())} onClick={doManual}>{t(lang, 'prevBtn')}</button>
-          <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>
+          {!isEdit && <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>}
         </>}
 
         {mode === 'preview' && prev && <>
@@ -289,7 +359,11 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
             <h3 className="font-display text-xl font-bold mb-2">{prev.title}</h3>
             {prev.description && <p className="text-xs text-gray-500 mb-3">{prev.description}</p>}
-            {(prev.tags || []).length > 0 && <div className="flex gap-1.5 flex-wrap mb-3">{prev.tags.map(tg => <span key={tg} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 font-semibold">{tg}</span>)}</div>}
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {prev.dish_type && <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{prev.dish_type}</span>}
+              {prev.meal_time && <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{prev.meal_time}</span>}
+              {(prev.tags || []).map(tg => <span key={tg} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 font-semibold">{tg}</span>)}
+            </div>
             <div className="flex gap-3 text-xs text-gray-400 mb-3 flex-wrap">
               {prev.prep_time && <span>🔪 {prev.prep_time}</span>}
               {prev.cook_time && <span>⏱ {prev.cook_time}</span>}
@@ -304,8 +378,10 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           </div>
 
           <div className="flex gap-2">
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#faf8f5] border border-gray-200" onClick={() => setMode('ai')}>← {t(lang, 'back')}</button>
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-700 text-white" onClick={publish} disabled={busy}>{t(lang, 'publish')} 🚀</button>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#faf8f5] border border-gray-200" onClick={() => setMode('manual')}>← {t(lang, 'back')}</button>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-700 text-white" onClick={publish} disabled={busy}>
+              {isEdit ? t(lang, 'saveChanges') : t(lang, 'publish') + ' 🚀'}
+            </button>
           </div>
         </>}
       </div>

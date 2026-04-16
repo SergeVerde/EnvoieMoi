@@ -15,6 +15,9 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
   const [editWeb, setEditWeb] = useState('');
   const [editName, setEditName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [profileSection, setProfileSection] = useState(null); // null | 'followers' | 'following'
+  const [userList, setUserList] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
   const avatarRef = useRef(null);
 
   const isMe = userId === currentUser?.id;
@@ -40,6 +43,28 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
       setIsFollowing(!!data);
     }
     setLoading(false);
+  }
+
+  async function openFollowers() {
+    setListLoading(true);
+    setProfileSection('followers');
+    const { data } = await supabase.from('follows').select('follower_id').eq('following_id', userId);
+    const ids = (data || []).map(d => d.follower_id);
+    if (!ids.length) { setUserList([]); setListLoading(false); return; }
+    const { data: profs } = await supabase.from('profiles').select('id, username, display_name, avatar_url').in('id', ids);
+    setUserList(profs || []);
+    setListLoading(false);
+  }
+
+  async function openFollowing() {
+    setListLoading(true);
+    setProfileSection('following');
+    const { data } = await supabase.from('follows').select('following_id').eq('follower_id', userId);
+    const ids = (data || []).map(d => d.following_id);
+    if (!ids.length) { setUserList([]); setListLoading(false); return; }
+    const { data: profs } = await supabase.from('profiles').select('id, username, display_name, avatar_url').in('id', ids);
+    setUserList(profs || []);
+    setListLoading(false);
   }
 
   async function toggleFollow() {
@@ -90,8 +115,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     </div>
   );
 
-if (!prof) {
-    // Profile doesn't exist yet, create it
+  if (!prof) {
     const createProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -113,6 +137,52 @@ if (!prof) {
       </div>
     );
   }
+
+  // Followers / Following panel
+  if (profileSection) {
+    const title = profileSection === 'followers' ? t(lang, 'followersTitle') : t(lang, 'followingTitle');
+    return (
+      <div className="max-w-md mx-auto min-h-screen pb-6">
+        <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={() => setProfileSection(null)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h1 className="font-display text-xl font-extrabold gradient-text">{title}</h1>
+          <div className="w-10" />
+        </div>
+        <div className="px-5 pt-4">
+          {listLoading ? (
+            <div className="flex justify-center py-12"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /></div>
+          ) : userList.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-12">Пока никого нет</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {userList.map(u => (
+                <button
+                  key={u.id}
+                  className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left"
+                  onClick={() => { setProfileSection(null); onBack(); setTimeout(() => onOpenRecipe && window.dispatchEvent(new CustomEvent('openProfile', { detail: u.id })), 50); }}
+                >
+                  {u.avatar_url ? (
+                    <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center text-white font-extrabold font-display">
+                      {(u.display_name || u.username || '?')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-bold text-sm">{u.display_name || u.username}</div>
+                    <div className="text-xs text-gray-400">@{u.username}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24">
       {/* Header */}
@@ -156,9 +226,18 @@ if (!prof) {
 
           {/* Stats */}
           <div className="flex justify-center gap-6 mt-3">
-            <div className="text-center"><div className="text-lg font-extrabold">{recipes.length}</div><div className="text-[11px] text-gray-400">{t(lang, 'rcpC')}</div></div>
-            <div className="text-center"><div className="text-lg font-extrabold">{followersCount}</div><div className="text-[11px] text-gray-400">{t(lang, 'followers')}</div></div>
-            <div className="text-center"><div className="text-lg font-extrabold">{followingCount}</div><div className="text-[11px] text-gray-400">{t(lang, 'following')}</div></div>
+            <div className="text-center">
+              <div className="text-lg font-extrabold">{recipes.length}</div>
+              <div className="text-[11px] text-gray-400">{t(lang, 'rcpC')}</div>
+            </div>
+            <button className="text-center" onClick={openFollowers}>
+              <div className="text-lg font-extrabold">{followersCount}</div>
+              <div className="text-[11px] text-gray-400 underline-offset-2 hover:underline">{t(lang, 'followers')}</div>
+            </button>
+            <button className="text-center" onClick={openFollowing}>
+              <div className="text-lg font-extrabold">{followingCount}</div>
+              <div className="text-[11px] text-gray-400 underline-offset-2 hover:underline">{t(lang, 'following')}</div>
+            </button>
           </div>
 
           {/* Bio */}
@@ -217,7 +296,6 @@ if (!prof) {
                   <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
                     <span>❤️ {r.likes_count || 0}</span>
                     <span>💬 {r.comments_count || 0}</span>
-                    <span>{timeAgo(r.created_at, lang)}</span>
                   </div>
                 </div>
               </div>

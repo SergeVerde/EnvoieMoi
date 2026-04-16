@@ -8,8 +8,8 @@ const LANGS_MAP = {
 function buildSystem(lang) {
   const ln = LANGS_MAP[lang] || 'Русский';
   return `Ты парсер рецептов. Верни ТОЛЬКО JSON без backticks. Переведи всё на ${ln}.
-{"title":"","description":"","servings":4,"cook_time":"","prep_time":"","calories":null,"calories_per":"serving","tags":[],"tips":"","ingredients":[{"amount":1,"unit":"","name":""}],"steps":[{"title":"","content":"","timer_seconds":null}]}
-unit: г,кг,мл,л,ч.л.,ст.л.,стакан,шт,щепотка,по вкусу,пучок,зубчик,"". tags макс 5.`;
+{"title":"","description":"","servings":4,"cook_time":"","prep_time":"","calories":null,"calories_per":"serving","dish_type":"","meal_time":"","tags":[],"tips":"","ingredients":[{"amount":1,"unit":"","name":""}],"steps":[{"title":"","content":"","timer_seconds":null}]}
+unit: г,кг,мл,л,ч.л.,ст.л.,стакан,шт,щепотка,по вкусу,пучок,зубчик,"". tags макс 5. dish_type: Напиток|Закуска|Салат|Суп|Основное блюдо|Гарнир|Десерт|Выпечка или "". meal_time: Завтрак|Обед|Ужин|Перекус или "".`;
 }
 
 export async function POST(request) {

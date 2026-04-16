@@ -26,6 +26,7 @@ export default function Home() {
   const [viewUserId, setViewUserId] = useState(null);
   const [toast, setToast] = useState('');
   const [settings, setSettings] = useState({ ui_lang: 'ru', recipe_lang: 'ru' });
+  const [editRecipeData, setEditRecipeData] = useState(null);
 
   const L = settings.ui_lang;
   const canAdd = ['cook', 'admin', 'creator'].includes(profile?.role);
@@ -153,7 +154,23 @@ export default function Home() {
       onFav={() => toggleFav(selectedId)}
       onBack={() => { setScreen('feed'); setSelectedId(null); }}
       onOpenProfile={openProfile}
+      onEdit={(recipeData) => { setEditRecipeData(recipeData); setScreen('edit'); }}
       showToast={showToast}
+    />
+  );
+
+  // Edit
+  if (screen === 'edit' && editRecipeData) return (
+    <AddRecipe
+      supabase={supabase}
+      user={user}
+      profile={profile}
+      lang={L}
+      recipeLang={settings.recipe_lang}
+      canAdd={canAdd}
+      editRecipe={editRecipeData}
+      onPublished={() => { loadRecipes(); setScreen('detail'); setEditRecipeData(null); showToast(t(L, 'updatedMsg')); }}
+      onBack={() => { setScreen('detail'); setEditRecipeData(null); }}
     />
   );
 

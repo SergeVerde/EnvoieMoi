@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { t, timeAgo } from '@/lib/i18n';
 
 function fmtTimer(s) {
@@ -9,7 +9,7 @@ function fmtTimer(s) {
   return s + ' сек';
 }
 
-export default function RecipeDetail({ recipeId, supabase, user, lang, liked, faved, onLike, onFav, onBack, onOpenProfile, showToast }) {
+export default function RecipeDetail({ recipeId, supabase, user, lang, liked, faved, onLike, onFav, onBack, onOpenProfile, onEdit, showToast }) {
   const [recipe, setRecipe] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [mainPhoto, setMainPhoto] = useState(null);
@@ -17,6 +17,9 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
   const [newComment, setNewComment] = useState('');
   const [mult, setMult] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
+  const commentRef = useRef(null);
 
   useEffect(() => { load(); }, [recipeId]);
 
@@ -40,12 +43,19 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
     if (!newComment.trim()) return;
     await supabase.from('comments').insert({ recipe_id: recipeId, user_id: user.id, text: newComment.trim() });
     setNewComment('');
+    setReplyTo(null);
     load();
   }
 
   async function deleteComment(id) {
     await supabase.from('comments').delete().eq('id', id);
     setComments(comments.filter(c => c.id !== id));
+  }
+
+  function handleReply(username) {
+    setReplyTo(username);
+    setNewComment(`@${username} `);
+    setTimeout(() => commentRef.current?.focus(), 50);
   }
 
   function doShare() {
@@ -65,31 +75,70 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
   const r = recipe;
   const base = r.servings || 4;
   const cur = Math.max(1, Math.round(base * mult));
+  const allPhotos = photos.length > 0 ? photos : (mainPhoto ? [{ id: 'main', url: mainPhoto }] : []);
+  const isAuthor = user.id === r.user_id;
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
+      {/* Lightbox */}
+      {lightboxIdx !== null && allPhotos.length > 0 && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center" onClick={() => setLightboxIdx(null)}>
+          <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white text-2xl z-10" onClick={() => setLightboxIdx(null)}>✕</button>
+          {allPhotos.length > 1 && (
+            <>
+              <button
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-white text-4xl z-10 disabled:opacity-30"
+                disabled={lightboxIdx === 0}
+                onClick={e => { e.stopPropagation(); setLightboxIdx(i => i - 1); }}
+              >‹</button>
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center text-white text-4xl z-10 disabled:opacity-30"
+                disabled={lightboxIdx === allPhotos.length - 1}
+                onClick={e => { e.stopPropagation(); setLightboxIdx(i => i + 1); }}
+              >›</button>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/50 text-sm">{lightboxIdx + 1} / {allPhotos.length}</div>
+            </>
+          )}
+          <img src={allPhotos[lightboxIdx]?.url} alt="" className="max-w-full max-h-screen object-contain px-14" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
       {/* Header */}
       <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
         <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h1 className="font-display text-xl font-extrabold gradient-text">{t(lang, 'recipe')}</h1>
-        <div className="w-10" />
+        {isAuthor && onEdit ? (
+          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={() => onEdit(r)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        ) : <div className="w-10" />}
       </div>
 
       <div className="px-5 pt-4">
         {/* Main photo */}
         {mainPhoto ? (
-          <div className="h-52 rounded-2xl mb-5 bg-cover bg-center" style={{ backgroundImage: `url(${mainPhoto})` }} />
+          <div
+            className="h-52 rounded-2xl mb-3 bg-cover bg-center cursor-pointer"
+            style={{ backgroundImage: `url(${mainPhoto})` }}
+            onClick={() => setLightboxIdx(0)}
+          />
         ) : (
-          <div className="h-52 rounded-2xl mb-5 flex items-center justify-center text-7xl" style={{ background: '#fef3e2' }}>🍽️</div>
+          <div className="h-52 rounded-2xl mb-3 flex items-center justify-center text-7xl" style={{ background: '#fef3e2' }}>🍽️</div>
         )}
 
         {/* Gallery */}
         {photos.length > 1 && (
-          <div className="flex gap-2 mb-5 overflow-x-auto hide-scrollbar">
-            {photos.map(p => (
-              <img key={p.id} src={p.url} alt="" className="h-40 rounded-xl object-cover flex-shrink-0 cursor-pointer" onClick={() => setMainPhoto(p.url)} />
+          <div className="flex gap-2 mb-4 overflow-x-auto hide-scrollbar">
+            {photos.map((p, i) => (
+              <img
+                key={p.id}
+                src={p.url}
+                alt=""
+                className={`h-16 w-16 rounded-xl object-cover flex-shrink-0 cursor-pointer border-2 ${mainPhoto === p.url ? 'border-brand' : 'border-transparent'}`}
+                onClick={() => { setMainPhoto(p.url); setLightboxIdx(i); }}
+              />
             ))}
           </div>
         )}
@@ -177,8 +226,16 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
         {/* Comments */}
         <h3 className="font-display text-lg font-bold mb-3">{t(lang, 'comments')} ({comments.length})</h3>
 
+        {replyTo && (
+          <div className="flex items-center gap-2 mb-2 px-1 text-xs text-gray-500">
+            <span>Отвечаю @{replyTo}</span>
+            <button className="text-gray-400 ml-1" onClick={() => { setReplyTo(null); setNewComment(''); }}>✕</button>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-4">
           <input
+            ref={commentRef}
             className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white"
             placeholder={t(lang, 'addComment')}
             value={newComment}
@@ -198,7 +255,7 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
           <div className="flex flex-col gap-3">
             {comments.map(c => (
               <div key={c.id} className="bg-white rounded-xl p-3 border border-gray-100">
-                <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   {c.profiles?.avatar_url ? (
                     <img src={c.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
@@ -207,12 +264,16 @@ export default function RecipeDetail({ recipeId, supabase, user, lang, liked, fa
                     </div>
                   )}
                   <span className="text-xs font-bold">{c.profiles?.display_name || c.profiles?.username}</span>
-                  <span className="text-xs text-gray-400">{timeAgo(c.created_at, lang)}</span>
-                  {c.user_id === user.id && (
-                    <button className="ml-auto text-xs text-red-400 font-semibold" onClick={() => deleteComment(c.id)}>
-                      {t(lang, 'deleteComment')}
-                    </button>
+                  {c.user_id === r.user_id && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700">{t(lang, 'authorBadge')}</span>
                   )}
+                  <span className="text-xs text-gray-400">{timeAgo(c.created_at, lang)}</span>
+                  <div className="ml-auto flex items-center gap-3">
+                    <button className="text-xs text-gray-400 font-semibold" onClick={() => handleReply(c.profiles?.display_name || c.profiles?.username)}>{t(lang, 'replyBtn')}</button>
+                    {c.user_id === user.id && (
+                      <button className="text-xs text-red-400 font-semibold" onClick={() => deleteComment(c.id)}>{t(lang, 'deleteComment')}</button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600">{c.text}</p>
               </div>
