@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import { t, timeAgo } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import RecipeCard from '@/components/RecipeCard';
 import BottomNav from '@/components/BottomNav';
 import AuthScreen from '@/components/AuthScreen';
@@ -28,7 +28,7 @@ export default function Home() {
   const [settings, setSettings] = useState({ ui_lang: 'ru', recipe_lang: 'ru' });
 
   const L = settings.ui_lang;
-  const canAdd = ['creator', 'admin', 'premium'].includes(profile?.role);
+  const canAdd = ['cook', 'admin', 'creator'].includes(profile?.role);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
@@ -65,7 +65,7 @@ export default function Home() {
         username: username,
         display_name: user?.user_metadata?.full_name || username,
         avatar_url: user?.user_metadata?.avatar_url || '',
-        role: 'creator',
+        role: 'cook',
       }, { onConflict: 'id' });
       const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (newProfile) setProfile(newProfile);

@@ -101,7 +101,7 @@ if (!prof) {
           username: username,
           display_name: user.user_metadata?.full_name || user.user_metadata?.name || username,
           avatar_url: user.user_metadata?.avatar_url || '',
-          role: 'creator',
+          role: 'cook',
         }, { onConflict: 'id' });
         load();
       }
