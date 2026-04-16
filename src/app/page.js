@@ -57,6 +57,19 @@ export default function Home() {
     ]);
 
     if (profileRes.data) setProfile(profileRes.data);
+    if (!profileRes.data) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const username = user?.email?.split('@')[0] || 'user_' + userId.slice(0, 6);
+      await supabase.from('profiles').upsert({
+        id: userId,
+        username: username,
+        display_name: user?.user_metadata?.full_name || username,
+        avatar_url: user?.user_metadata?.avatar_url || '',
+        role: 'creator',
+      }, { onConflict: 'id' });
+      const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (newProfile) setProfile(newProfile);
+    }
     if (settingsRes.data) setSettings(settingsRes.data);
     setFavIds((favsRes.data || []).map(f => f.recipe_id));
     setLikeIds((likesRes.data || []).map(l => l.recipe_id));
