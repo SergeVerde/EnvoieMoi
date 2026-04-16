@@ -8,6 +8,7 @@ export default function AuthScreen({ supabase }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkEmail, setCheckEmail] = useState(false);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -18,9 +19,13 @@ export default function AuthScreen({ supabase }) {
       const { error: err } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
-        options: { data: { full_name: email.split('@')[0] } },
+        options: {
+          data: { full_name: email.split('@')[0] },
+          emailRedirectTo: window.location.origin + '/auth/callback',
+        },
       });
       if (err) setError(err.message);
+      else setCheckEmail(true);
     } else {
       const { error: err } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -30,6 +35,30 @@ export default function AuthScreen({ supabase }) {
     }
     setLoading(false);
   };
+
+  if (checkEmail) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
+        <div className="text-center w-full">
+          <div className="text-6xl mb-6">📧</div>
+          <h1 className="font-display text-2xl font-extrabold mb-2">Проверь почту!</h1>
+          <p className="text-gray-500 mb-6 text-sm">
+            Мы отправили ссылку для подтверждения на<br/>
+            <strong>{email}</strong>
+          </p>
+          <p className="text-gray-400 text-xs mb-6">
+            Нажми на ссылку в письме — ты автоматически войдёшь в приложение
+          </p>
+          <button
+            onClick={() => { setCheckEmail(false); setIsSignUp(false); }}
+            className="text-xs text-amber-600 font-semibold"
+          >
+            Уже подтвердил? Войти
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
