@@ -90,8 +90,29 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     </div>
   );
 
-  if (!prof) return null;
-
+if (!prof) {
+    // Profile doesn't exist yet, create it
+    const createProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const username = user.email?.split('@')[0] || 'user_' + user.id.slice(0, 6);
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          username: username,
+          display_name: user.user_metadata?.full_name || user.user_metadata?.name || username,
+          avatar_url: user.user_metadata?.avatar_url || '',
+          role: 'creator',
+        }, { onConflict: 'id' });
+        load();
+      }
+    };
+    createProfile();
+    return (
+      <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
+        <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
+      </div>
+    );
+  }
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24">
       {/* Header */}
