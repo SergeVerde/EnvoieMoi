@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import { t } from '@/lib/i18n';
+import { t, DISH_TYPES, MEAL_TIMES } from '@/lib/i18n';
 import RecipeCard from '@/components/RecipeCard';
 import BottomNav from '@/components/BottomNav';
 import AuthScreen from '@/components/AuthScreen';
 import AddRecipe from '@/components/AddRecipe';
 import RecipeDetail from '@/components/RecipeDetail';
+import RecipeExportView from '@/components/RecipeExportView';
 import ProfileView from '@/components/ProfileView';
 import SettingsView from '@/components/SettingsView';
+import OnboardingView from '@/components/OnboardingView';
 
 export default function Home() {
   const supabase = createClient();
@@ -27,13 +29,19 @@ export default function Home() {
   const [toast, setToast] = useState('');
   const [settings, setSettings] = useState({ ui_lang: 'ru', recipe_lang: 'ru' });
   const [editRecipeData, setEditRecipeData] = useState(null);
+  const [exportRecipeData, setExportRecipeData] = useState(null);
+  const [exportPhotos, setExportPhotos] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterDishType, setFilterDishType] = useState(null);
+  const [filterMealTime, setFilterMealTime] = useState(null);
+  const [profileResults, setProfileResults] = useState([]);
 
   const L = settings.ui_lang;
   const canAdd = ['cook', 'admin', 'creator'].includes(profile?.role);
+  const isProfileSearch = search.startsWith('@');
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
-  // Auth listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
@@ -48,6 +56,14 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isProfileSearch || search.length < 2) { setProfileResults([]); return; }
+    const q = search.slice(1).toLowerCase();
+    supabase.from('profiles').select('id, username, display_name, avatar_url')
+      .ilike('username', `%${q}%`).limit(10)
+      .then(({ data }) => setProfileResults(data || []));
+  }, [search]);
 
   async function loadUserData(userId) {
     const [profileRes, settingsRes, favsRes, likesRes] = await Promise.all([
@@ -66,7 +82,7 @@ export default function Home() {
         username: username,
         display_name: user?.user_metadata?.full_name || username,
         avatar_url: user?.user_metadata?.avatar_url || '',
-        role: 'cook',
+        role: 'guest',
       }, { onConflict: 'id' });
       const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (newProfile) setProfile(newProfile);
@@ -88,7 +104,6 @@ export default function Home() {
     setRecipes(data || []);
   }
 
-  // Like / Fav
   async function toggleLike(recipeId) {
     const liked = likeIds.includes(recipeId);
     if (liked) {
@@ -98,7 +113,6 @@ export default function Home() {
       await supabase.from('likes').insert({ user_id: user.id, recipe_id: recipeId });
       setLikeIds([...likeIds, recipeId]);
     }
-    // Refresh recipes to update count
     loadRecipes();
   }
 
@@ -115,33 +129,51 @@ export default function Home() {
     }
   }
 
-  // Navigate
   function openRecipe(id) { setSelectedId(id); setScreen('detail'); }
   function openProfile(userId) { setViewUserId(userId || user?.id); setScreen('profile'); }
 
-  // Filter
   const allTags = [...new Set(recipes.flatMap(r => r.tags || []))];
+  const hasFilters = filterDishType || filterMealTime;
+
   const filtered = recipes.filter(r => {
     if (screen === 'favorites' && !favIds.includes(r.id)) return false;
     if (filter && !(r.tags || []).includes(filter)) return false;
-    if (search) {
+    if (filterDishType) {
+      const dt = r.dish_type;
+      if (!dt || (Array.isArray(dt) ? !dt.includes(filterDishType) : dt !== filterDishType)) return false;
+    }
+    if (filterMealTime) {
+      const mt = r.meal_time;
+      if (!mt || (Array.isArray(mt) ? !mt.includes(filterMealTime) : mt !== filterMealTime)) return false;
+    }
+    if (search && !isProfileSearch) {
       const q = search.toLowerCase();
       return r.title.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q);
     }
     return true;
   });
 
-  // Loading
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
       <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
     </div>
   );
 
-  // Auth
   if (!user) return <AuthScreen supabase={supabase} />;
 
-  // Detail
+  // Onboarding gate
+  if (profile && profile.age === null && screen !== 'settings' && screen !== 'profile') {
+    return (
+      <OnboardingView
+        supabase={supabase}
+        user={user}
+        profile={profile}
+        lang={L}
+        onComplete={(updatedProfile) => { setProfile(updatedProfile); setScreen('feed'); }}
+      />
+    );
+  }
+
   if (screen === 'detail' && selectedId) return (
     <RecipeDetail
       recipeId={selectedId}
@@ -155,11 +187,20 @@ export default function Home() {
       onBack={() => { setScreen('feed'); setSelectedId(null); }}
       onOpenProfile={openProfile}
       onEdit={(recipeData) => { setEditRecipeData(recipeData); setScreen('edit'); }}
+      onExport={(recipeData, recipePhotos) => { setExportRecipeData(recipeData); setExportPhotos(recipePhotos); setScreen('export'); }}
       showToast={showToast}
     />
   );
 
-  // Edit
+  if (screen === 'export' && exportRecipeData) return (
+    <RecipeExportView
+      recipe={exportRecipeData}
+      photos={exportPhotos}
+      lang={L}
+      onBack={() => { setScreen('detail'); setExportRecipeData(null); setExportPhotos([]); }}
+    />
+  );
+
   if (screen === 'edit' && editRecipeData) return (
     <AddRecipe
       supabase={supabase}
@@ -174,7 +215,6 @@ export default function Home() {
     />
   );
 
-  // Add
   if (screen === 'add') return (
     <AddRecipe
       supabase={supabase}
@@ -188,7 +228,6 @@ export default function Home() {
     />
   );
 
-  // Profile
   if (screen === 'profile') return (
     <ProfileView
       supabase={supabase}
@@ -204,7 +243,6 @@ export default function Home() {
     />
   );
 
-  // Settings
   if (screen === 'settings') return (
     <SettingsView
       supabase={supabase}
@@ -225,20 +263,64 @@ export default function Home() {
       </div>
 
       {/* Search */}
-      <div className="px-5 pb-3">
-        <div className="flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-xl">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-          <input
-            className="flex-1 outline-none text-sm bg-transparent"
-            placeholder={t(L, 'search')}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+      <div className="px-5 pt-3 pb-2">
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-xl">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <input
+              className="flex-1 outline-none text-sm bg-transparent"
+              placeholder={isProfileSearch ? t(L, 'searchProfiles') : t(L, 'search')}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && <button className="text-gray-300 text-lg leading-none" onClick={() => setSearch('')}>✕</button>}
+          </div>
+          <button
+            className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${hasFilters || filterOpen ? 'bg-gray-800 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-500'}`}
+            onClick={() => setFilterOpen(o => !o)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+          </button>
         </div>
       </div>
 
+      {/* Filter panel */}
+      {filterOpen && (
+        <div className="px-5 pb-3">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div className="mb-3">
+              <div className="text-xs font-bold text-gray-500 mb-2">{t(L, 'dishType')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {DISH_TYPES.map(dt => (
+                  <button
+                    key={dt}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${filterDishType === dt ? 'bg-gray-800 text-white border-gray-800' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    onClick={() => setFilterDishType(filterDishType === dt ? null : dt)}
+                  >{dt}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-500 mb-2">{t(L, 'mealTime')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {MEAL_TIMES.map(mt => (
+                  <button
+                    key={mt}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${filterMealTime === mt ? 'bg-gray-800 text-white border-gray-800' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    onClick={() => setFilterMealTime(filterMealTime === mt ? null : mt)}
+                  >{mt}</button>
+                ))}
+              </div>
+            </div>
+            {hasFilters && (
+              <button className="mt-3 text-xs text-red-400 font-semibold" onClick={() => { setFilterDishType(null); setFilterMealTime(null); }}>{t(L, 'clearFilters')}</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tags */}
-      {allTags.length > 0 && (
+      {!isProfileSearch && allTags.length > 0 && (
         <div className="flex gap-2 px-5 pb-3 overflow-x-auto hide-scrollbar">
           <button
             className={`px-4 py-2 rounded-full text-xs font-semibold border whitespace-nowrap ${!filter ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`}
@@ -254,33 +336,61 @@ export default function Home() {
         </div>
       )}
 
-      {/* Recipes */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 px-5">
-          <div className="text-5xl mb-3">{screen === 'favorites' ? '⭐' : '📝'}</div>
-          <h3 className="font-display text-xl font-bold mb-2">{screen === 'favorites' ? t(L, 'emptyFav') : t(L, 'empty')}</h3>
-          <p className="text-gray-500 text-sm">{screen === 'favorites' ? t(L, 'saveFav') : t(L, 'addFirst')}</p>
-        </div>
+      {/* Profile search results */}
+      {isProfileSearch ? (
+        profileResults.length === 0 ? (
+          <div className="text-center py-8 px-5">
+            <p className="text-sm text-gray-400">{search.length > 1 ? t(L, 'noResults') : t(L, 'searchProfiles')}</p>
+          </div>
+        ) : (
+          <div className="px-5 flex flex-col gap-2">
+            <div className="text-xs font-bold text-gray-500 mb-1">{t(L, 'profiles')}</div>
+            {profileResults.map(u => (
+              <button key={u.id} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left w-full" onClick={() => { setSearch(''); openProfile(u.id); }}>
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center text-white font-extrabold font-display">
+                    {(u.display_name || u.username || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div className="font-bold text-sm">{u.display_name || u.username}</div>
+                  <div className="text-xs text-gray-400">@{u.username}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )
       ) : (
-        <div className="px-5 flex flex-col gap-4">
-          {filtered.map(recipe => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              lang={L}
-              liked={likeIds.includes(recipe.id)}
-              faved={favIds.includes(recipe.id)}
-              onOpen={() => openRecipe(recipe.id)}
-              onLike={() => toggleLike(recipe.id)}
-              onFav={() => toggleFav(recipe.id)}
-              onShare={() => {
-                const txt = `🍽️ ${recipe.title}\n${recipe.description || ''}`;
-                if (navigator.share) navigator.share({ title: recipe.title, text: txt });
-                else { navigator.clipboard.writeText(txt); showToast(t(L, 'copied')); }
-              }}
-            />
-          ))}
-        </div>
+        /* Recipes */
+        filtered.length === 0 ? (
+          <div className="text-center py-16 px-5">
+            <div className="text-5xl mb-3">{screen === 'favorites' ? '⭐' : '📝'}</div>
+            <h3 className="font-display text-xl font-bold mb-2">{screen === 'favorites' ? t(L, 'emptyFav') : t(L, 'empty')}</h3>
+            <p className="text-gray-500 text-sm">{screen === 'favorites' ? t(L, 'saveFav') : t(L, 'addFirst')}</p>
+          </div>
+        ) : (
+          <div className="px-5 flex flex-col gap-4">
+            {filtered.map(recipe => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                lang={L}
+                liked={likeIds.includes(recipe.id)}
+                faved={favIds.includes(recipe.id)}
+                onOpen={() => openRecipe(recipe.id)}
+                onLike={() => toggleLike(recipe.id)}
+                onFav={() => toggleFav(recipe.id)}
+                onShare={() => {
+                  const txt = `🍽️ ${recipe.title}\n${recipe.description || ''}`;
+                  if (navigator.share) navigator.share({ title: recipe.title, text: txt });
+                  else { navigator.clipboard.writeText(txt); showToast(t(L, 'copied')); }
+                }}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {/* Toast */}

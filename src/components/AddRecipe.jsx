@@ -26,11 +26,12 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   const [mCalP, setMCalP] = useState('serving');
   const [mServ, setMServ] = useState('4');
   const [mTags, setMTags] = useState('');
-  const [mDishType, setMDishType] = useState('');
-  const [mMealTime, setMMealTime] = useState('');
+  const [mDishTypes, setMDishTypes] = useState([]); // array for multi-select
+  const [mMealTimes, setMMealTimes] = useState([]); // array for multi-select
 
   // Photos
-  const [photos, setPhotos] = useState([]);
+  const [photos, setPhotos] = useState([]);           // new photos to upload
+  const [existingPhotos, setExistingPhotos] = useState([]); // existing from DB (edit mode)
   const [ocrImgs, setOcrImgs] = useState([]);
   const fRef = useRef(null);
   const oRef = useRef(null);
@@ -50,10 +51,25 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       setMCalP(editRecipe.calories_per || 'serving');
       setMServ(String(editRecipe.servings || 4));
       setMTags((editRecipe.tags || []).join(', '));
-      setMDishType(editRecipe.dish_type || '');
-      setMMealTime(editRecipe.meal_time || '');
+      // Support both array and string for dish_type/meal_time
+      const dt = editRecipe.dish_type;
+      const mt = editRecipe.meal_time;
+      setMDishTypes(Array.isArray(dt) ? dt : (dt ? [dt] : []));
+      setMMealTimes(Array.isArray(mt) ? mt : (mt ? [mt] : []));
+      // Load existing photos
+      if (editRecipe.id) {
+        supabase.from('recipe_photos').select('*').eq('recipe_id', editRecipe.id).order('sort_order')
+          .then(({ data }) => setExistingPhotos(data || []));
+      }
     }
   }, []);
+
+  function toggleDishType(dt) {
+    setMDishTypes(prev => prev.includes(dt) ? prev.filter(x => x !== dt) : [...prev, dt]);
+  }
+  function toggleMealTime(mt) {
+    setMMealTimes(prev => prev.includes(mt) ? prev.filter(x => x !== mt) : [...prev, mt]);
+  }
 
   function cancelRequest() {
     abortRef.current?.abort();
@@ -110,17 +126,29 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   }
 
   async function addPhotos(e) {
+    const total = photos.length + existingPhotos.length;
     const files = [...(e.target.files || [])];
-    if (photos.length + files.length > 5) { e.target.value = ''; return; }
+    if (total + files.length > 5) { e.target.value = ''; return; }
     setBusy(true); setBMsg(t(lang, 'resizing'));
     const np = [...photos];
     for (const f of files) {
       const blob = await resizeImage(f);
-      np.push({ blob, url: URL.createObjectURL(blob), main: np.length === 0 });
+      np.push({ blob, url: URL.createObjectURL(blob), main: total === 0 && np.length === 0 });
     }
     setPhotos(np);
     setBusy(false); setBMsg('');
     e.target.value = '';
+  }
+
+  async function removeExistingPhoto(photoId) {
+    await supabase.from('recipe_photos').delete().eq('id', photoId);
+    setExistingPhotos(existingPhotos.filter(p => p.id !== photoId));
+  }
+
+  async function setExistingMain(photoId) {
+    await supabase.from('recipe_photos').update({ is_main: false }).eq('recipe_id', editRecipe.id);
+    await supabase.from('recipe_photos').update({ is_main: true }).eq('id', photoId);
+    setExistingPhotos(existingPhotos.map(p => ({ ...p, is_main: p.id === photoId })));
   }
 
   function doManual() {
@@ -134,8 +162,8 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       calories: mCal ? parseInt(mCal) : null, calories_per: mCalP,
       tags: mTags.split(',').map(s => s.trim()).filter(Boolean),
       tips: mTips,
-      dish_type: mDishType || null,
-      meal_time: mMealTime || null,
+      dish_type: mDishTypes.length > 0 ? mDishTypes : null,
+      meal_time: mMealTimes.length > 0 ? mMealTimes : null,
       ingredients: mI.filter(x => x.name.trim()).map(x => ({ name: x.name.trim(), amount: parseFloat(x.amount) || 0, unit: x.unit })),
       steps: mS.filter(x => x.trim()).map(x => ({ title: '', content: x.trim(), timer_seconds: null })),
     });
@@ -170,7 +198,8 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
         if (!upErr) {
           const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
-          await supabase.from('recipe_photos').insert({ recipe_id: prev.id, url: publicUrl, is_main: false, sort_order: 99 });
+          const isMain = existingPhotos.length === 0 && i === 0;
+          await supabase.from('recipe_photos').insert({ recipe_id: prev.id, url: publicUrl, is_main: isMain, sort_order: 99 + i });
         }
       }
     } else {
@@ -195,19 +224,20 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
     onPublished();
   }
 
+  // Guest/locked screen
   if (!canAdd) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
-      <div className="text-center">
-        <div className="text-5xl mb-3">🔒</div>
-        <p className="text-gray-500">{t(lang, 'cantAdd')}</p>
-        <button className="mt-4 px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold" onClick={onBack}>{t(lang, 'back')}</button>
+      <div className="text-center max-w-xs">
+        <div className="text-6xl mb-5">🍳</div>
+        <h2 className="font-display text-xl font-extrabold mb-3">{t(lang, 'guestWall')}</h2>
+        <p className="text-gray-500 text-sm leading-relaxed mb-6">{t(lang, 'guestWallSub')}</p>
+        <button className="px-6 py-3 border border-gray-200 rounded-2xl text-sm font-semibold bg-white" onClick={onBack}>{t(lang, 'back')}</button>
       </div>
     </div>
   );
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
-      {/* Header */}
       <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
         <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -225,7 +255,6 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             <p className="text-xs text-gray-500">{t(lang, 'pasteText')}</p>
           </div>
 
-          {/* OCR block */}
           <div className="border border-gray-200 rounded-2xl p-4 mb-4 bg-white">
             <div className="flex items-center gap-2 font-bold text-sm mb-2">📷 {t(lang, 'ocrTitle')}</div>
             <p className="text-xs text-gray-400 mb-2">{t(lang, 'ocrHint')}</p>
@@ -278,14 +307,14 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dishType')}</label>
           <div className="flex gap-1.5 flex-wrap mb-3">
             {DISH_TYPES.map(dt => (
-              <button key={dt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDishType === dt ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMDishType(mDishType === dt ? '' : dt)}>{dt}</button>
+              <button key={dt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDishTypes.includes(dt) ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleDishType(dt)}>{dt}</button>
             ))}
           </div>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'mealTime')}</label>
           <div className="flex gap-1.5 flex-wrap mb-3">
             {MEAL_TIMES.map(mt => (
-              <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTime === mt ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMMealTime(mMealTime === mt ? '' : mt)}>{mt}</button>
+              <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTimes.includes(mt) ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleMealTime(mt)}>{mt}</button>
             ))}
           </div>
 
@@ -335,18 +364,27 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         {mode === 'preview' && prev && <>
           <div className="text-center mb-4"><div className="text-4xl mb-2">👀</div><p className="text-xs text-gray-500">{t(lang, 'check')}</p></div>
 
-          {/* Photo upload */}
+          {/* Photos */}
           <label className="text-xs font-bold text-gray-500 mb-2 block">{t(lang, 'photos')}</label>
           <input type="file" accept="image/*" multiple ref={fRef} className="hidden" onChange={addPhotos} />
           <div className="grid grid-cols-3 gap-2 mb-4">
-            {photos.map((p, i) => (
-              <div key={i} className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer ${p.main ? 'border-brand' : 'border-transparent'}`} onClick={() => setPhotos(photos.map((v,j) => ({...v, main: j===i})))}>
+            {/* Existing photos (edit mode) */}
+            {existingPhotos.map((p) => (
+              <div key={p.id} className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer ${p.is_main ? 'border-brand' : 'border-transparent'}`} onClick={() => setExistingMain(p.id)}>
                 <img src={p.url} alt="" className="w-full h-full object-cover" />
-                {p.main && <div className="absolute top-1 left-1 bg-brand text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">★</div>}
+                {p.is_main && <div className="absolute top-1 left-1 bg-brand text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">★</div>}
+                <button className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-xs" onClick={e => { e.stopPropagation(); removeExistingPhoto(p.id); }}>×</button>
+              </div>
+            ))}
+            {/* New photos */}
+            {photos.map((p, i) => (
+              <div key={`new-${i}`} className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer ${p.main && existingPhotos.length === 0 ? 'border-brand' : 'border-dashed border-gray-300'}`} onClick={() => setPhotos(photos.map((v,j) => ({...v, main: j===i})))}>
+                <img src={p.url} alt="" className="w-full h-full object-cover" />
+                {p.main && existingPhotos.length === 0 && <div className="absolute top-1 left-1 bg-brand text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">★</div>}
                 <button className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-xs" onClick={e => { e.stopPropagation(); const np = photos.filter((_,j)=>j!==i); if(np.length&&!np.some(v=>v.main))np[0].main=true; setPhotos(np); }}>×</button>
               </div>
             ))}
-            {photos.length < 5 && (
+            {existingPhotos.length + photos.length < 5 && (
               <div className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer text-gray-400 gap-1 text-[11px] font-semibold" onClick={() => fRef.current?.click()}>
                 🖼 {t(lang, 'addPh')}
               </div>
@@ -355,13 +393,12 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
           {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
 
-          {/* Preview card */}
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
             <h3 className="font-display text-xl font-bold mb-2">{prev.title}</h3>
             {prev.description && <p className="text-xs text-gray-500 mb-3">{prev.description}</p>}
             <div className="flex gap-1.5 flex-wrap mb-2">
-              {prev.dish_type && <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{prev.dish_type}</span>}
-              {prev.meal_time && <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{prev.meal_time}</span>}
+              {(prev.dish_type || []).map(dt => <span key={dt} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{dt}</span>)}
+              {(prev.meal_time || []).map(mt => <span key={mt} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{mt}</span>)}
               {(prev.tags || []).map(tg => <span key={tg} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 font-semibold">{tg}</span>)}
             </div>
             <div className="flex gap-3 text-xs text-gray-400 mb-3 flex-wrap">

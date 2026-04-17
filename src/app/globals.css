@@ -26,3 +26,19 @@ body {
 
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { scrollbar-width: none; }
+
+/* Print / PDF export */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; color: #000 !important; }
+  @page { size: A4; margin: 18mm 20mm; }
+}
+
+.recipe-print h1 { font-family: 'Playfair Display', serif; font-size: 20pt; font-weight: 800; margin-bottom: 4pt; }
+.recipe-print h2 { font-family: 'Playfair Display', serif; font-size: 13pt; font-weight: 700; margin: 10pt 0 4pt; border-bottom: 1px solid #ddd; padding-bottom: 2pt; }
+.recipe-print p, .recipe-print li, .recipe-print td { font-size: 11pt; line-height: 1.5; color: #111; }
+.recipe-print .meta { font-size: 9pt; color: #666; margin-bottom: 8pt; }
+.recipe-print.compact h1 { font-size: 15pt; }
+.recipe-print.compact h2 { font-size: 11pt; margin: 6pt 0 2pt; }
+.recipe-print.compact p, .recipe-print.compact li, .recipe-print.compact td { font-size: 9pt; line-height: 1.35; }
+.recipe-print.compact .meta { font-size: 8pt; }

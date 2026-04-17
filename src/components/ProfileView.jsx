@@ -15,12 +15,15 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
   const [editWeb, setEditWeb] = useState('');
   const [editName, setEditName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [profileSection, setProfileSection] = useState(null); // null | 'followers' | 'following'
+  const [profileSection, setProfileSection] = useState(null);
   const [userList, setUserList] = useState([]);
   const [listLoading, setListLoading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [roleModal, setRoleModal] = useState(false);
   const avatarRef = useRef(null);
 
   const isMe = userId === currentUser?.id;
+  const canManage = !isMe && ['admin', 'creator'].includes(myProfile?.role);
 
   useEffect(() => { load(); }, [userId]);
 
@@ -109,6 +112,19 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     e.target.value = '';
   }
 
+  async function changeRole(newRole) {
+    await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    setProf({ ...prof, role: newRole });
+    setRoleModal(false);
+  }
+
+  function doShareProfile() {
+    const url = window.location.origin + '?u=' + (prof?.username || userId);
+    if (navigator.share) navigator.share({ title: prof?.display_name || prof?.username, url });
+    else navigator.clipboard.writeText(url);
+    setMenuOpen(false);
+  }
+
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
       <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
@@ -125,7 +141,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
           username: username,
           display_name: user.user_metadata?.full_name || user.user_metadata?.name || username,
           avatar_url: user.user_metadata?.avatar_url || '',
-          role: 'cook',
+          role: 'guest',
         }, { onConflict: 'id' });
         load();
       }
@@ -183,8 +199,32 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     );
   }
 
+  const roleKeys = ['guest', 'cook', ...(myProfile?.role === 'creator' ? ['admin'] : [])];
+
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24">
+      {/* Role modal */}
+      {roleModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end justify-center" onClick={() => setRoleModal(false)}>
+          <div className="bg-white rounded-t-3xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-lg font-bold mb-4 text-center">{t(lang, 'changeRole')}</h3>
+            <div className="flex flex-col gap-2">
+              {roleKeys.map(role => (
+                <button
+                  key={role}
+                  className={`w-full py-3 rounded-2xl text-sm font-bold border ${prof.role === role ? 'bg-gray-800 text-white border-gray-800' : 'bg-white border-gray-200 text-gray-700'}`}
+                  onClick={() => changeRole(role)}
+                >{t(lang, 'role' + role.charAt(0).toUpperCase() + role.slice(1))}</button>
+              ))}
+            </div>
+            <button className="w-full mt-3 py-2 text-sm text-gray-400" onClick={() => setRoleModal(false)}>{t(lang, 'back')}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Menu overlay */}
+      {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
+
       {/* Header */}
       <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
         <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
@@ -195,6 +235,19 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
           <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onSettings}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
+        ) : canManage ? (
+          <div className="relative z-50">
+            <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-xl font-bold text-gray-500 leading-none" onClick={() => setMenuOpen(o => !o)}>⋮</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-12 bg-white rounded-2xl border border-gray-200 shadow-xl min-w-[175px] py-2 z-50">
+                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={doShareProfile}>{t(lang, 'shareProfile')}</button>
+                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={() => { setMenuOpen(false); setRoleModal(true); }}>{t(lang, 'changeRole')}</button>
+                <div className="h-px bg-gray-100 mx-3 my-1" />
+                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-orange-500 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>{t(lang, 'blockUser')}</button>
+                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-500 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>{t(lang, 'reportUser')}</button>
+              </div>
+            )}
+          </div>
         ) : <div className="w-10" />}
       </div>
 
