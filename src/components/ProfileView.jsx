@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { t, timeAgo } from '@/lib/i18n';
 import { resizeImage } from '@/lib/image';
 
-export default function ProfileView({ supabase, userId, currentUser, profile: myProfile, lang, onBack, onOpenRecipe, onSettings, onLogout, setProfile }) {
+export default function ProfileView({ supabase, userId, currentUser, profile: myProfile, lang, onBack, onOpenRecipe, onSettings, onLogout, setProfile, onMessage }) {
   const [prof, setProf] = useState(null);
   const [recipes, setRecipes] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
@@ -20,6 +20,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
   const [listLoading, setListLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
+  const [avatarLightbox, setAvatarLightbox] = useState(false);
   const avatarRef = useRef(null);
 
   const isMe = userId === currentUser?.id;
@@ -127,7 +128,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-      <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
+      <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
     </div>
   );
 
@@ -149,7 +150,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     createProfile();
     return (
       <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-        <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
+        <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -159,8 +160,8 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     const title = profileSection === 'followers' ? t(lang, 'followersTitle') : t(lang, 'followingTitle');
     return (
       <div className="max-w-md mx-auto min-h-screen pb-6">
-        <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={() => setProfileSection(null)}>
+        <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={() => setProfileSection(null)}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <h1 className="font-display text-xl font-extrabold gradient-text">{title}</h1>
@@ -168,7 +169,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
         </div>
         <div className="px-5 pt-4">
           {listLoading ? (
-            <div className="flex justify-center py-12"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /></div>
+            <div className="flex justify-center py-12"><div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" /></div>
           ) : userList.length === 0 ? (
             <p className="text-center text-gray-400 text-sm py-12">Пока никого нет</p>
           ) : (
@@ -176,7 +177,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
               {userList.map(u => (
                 <button
                   key={u.id}
-                  className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left"
+                  className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left shadow-sm"
                   onClick={() => { setProfileSection(null); onBack(); setTimeout(() => onOpenRecipe && window.dispatchEvent(new CustomEvent('openProfile', { detail: u.id })), 50); }}
                 >
                   {u.avatar_url ? (
@@ -203,6 +204,14 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24">
+      {/* Avatar lightbox */}
+      {avatarLightbox && prof.avatar_url && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setAvatarLightbox(false)}>
+          <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white text-2xl">✕</button>
+          <img src={prof.avatar_url} alt="" className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
       {/* Role modal */}
       {roleModal && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-end justify-center" onClick={() => setRoleModal(false)}>
@@ -212,7 +221,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
               {roleKeys.map(role => (
                 <button
                   key={role}
-                  className={`w-full py-3 rounded-2xl text-sm font-bold border ${prof.role === role ? 'bg-gray-800 text-white border-gray-800' : 'bg-white border-gray-200 text-gray-700'}`}
+                  className={`w-full py-3 rounded-2xl text-sm font-bold border ${prof.role === role ? 'bg-gray-900 text-white border-gray-900' : 'bg-white border-gray-200 text-gray-700'}`}
                   onClick={() => changeRole(role)}
                 >{t(lang, 'role' + role.charAt(0).toUpperCase() + role.slice(1))}</button>
               ))}
@@ -226,20 +235,20 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
 
       {/* Header */}
-      <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
+      <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h1 className="font-display text-xl font-extrabold gradient-text">{t(lang, 'profile')}</h1>
         {isMe ? (
-          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onSettings}>
+          <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onSettings}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         ) : canManage ? (
           <div className="relative z-50">
-            <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-xl font-bold text-gray-500 leading-none" onClick={() => setMenuOpen(o => !o)}>⋮</button>
+            <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-xl font-bold text-gray-500 leading-none shadow-sm" onClick={() => setMenuOpen(o => !o)}>⋮</button>
             {menuOpen && (
-              <div className="absolute right-0 top-12 bg-white rounded-2xl border border-gray-200 shadow-xl min-w-[175px] py-2 z-50">
+              <div className="absolute right-0 top-12 bg-white rounded-2xl border border-gray-100 shadow-xl min-w-[175px] py-2 z-50">
                 <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={doShareProfile}>{t(lang, 'shareProfile')}</button>
                 <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={() => { setMenuOpen(false); setRoleModal(true); }}>{t(lang, 'changeRole')}</button>
                 <div className="h-px bg-gray-100 mx-3 my-1" />
@@ -256,40 +265,45 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
         <div className="text-center mb-6">
           <div className="relative inline-block">
             {prof.avatar_url ? (
-              <img src={prof.avatar_url} alt="" className="w-20 h-20 rounded-2xl object-cover mx-auto" />
+              <img
+                src={prof.avatar_url}
+                alt=""
+                className="w-24 h-24 rounded-3xl object-cover mx-auto cursor-pointer shadow-md"
+                onClick={() => setAvatarLightbox(true)}
+              />
             ) : (
-              <div className="w-20 h-20 rounded-2xl gradient-btn flex items-center justify-center text-3xl text-white font-extrabold font-display mx-auto">
+              <div className="w-24 h-24 rounded-3xl gradient-btn flex items-center justify-center text-3xl text-white font-extrabold font-display mx-auto shadow-md">
                 {(prof.display_name || prof.username || '?')[0].toUpperCase()}
               </div>
             )}
             {isMe && (
               <>
                 <input type="file" accept="image/*" ref={avatarRef} className="hidden" onChange={uploadAvatar} />
-                <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center text-sm shadow-md" onClick={() => avatarRef.current?.click()}>📷</button>
+                <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm shadow-md" onClick={() => avatarRef.current?.click()}>📷</button>
               </>
             )}
           </div>
 
           {editing ? (
-            <input className="mt-3 text-center font-display text-xl font-bold outline-none border-b-2 border-brand bg-transparent w-48" value={editName} onChange={e => setEditName(e.target.value)} />
+            <input className="mt-3 text-center font-display text-xl font-bold outline-none border-b-2 border-green-500 bg-transparent w-48" value={editName} onChange={e => setEditName(e.target.value)} />
           ) : (
             <h2 className="font-display text-xl font-bold mt-3">{prof.display_name || prof.username}</h2>
           )}
           <p className="text-xs text-gray-400">@{prof.username}</p>
 
           {/* Stats */}
-          <div className="flex justify-center gap-6 mt-3">
+          <div className="flex justify-center gap-8 mt-4">
             <div className="text-center">
               <div className="text-lg font-extrabold">{recipes.length}</div>
               <div className="text-[11px] text-gray-400">{t(lang, 'rcpC')}</div>
             </div>
             <button className="text-center" onClick={openFollowers}>
               <div className="text-lg font-extrabold">{followersCount}</div>
-              <div className="text-[11px] text-gray-400 underline-offset-2 hover:underline">{t(lang, 'followers')}</div>
+              <div className="text-[11px] text-gray-400">{t(lang, 'followers')}</div>
             </button>
             <button className="text-center" onClick={openFollowing}>
               <div className="text-lg font-extrabold">{followingCount}</div>
-              <div className="text-[11px] text-gray-400 underline-offset-2 hover:underline">{t(lang, 'following')}</div>
+              <div className="text-[11px] text-gray-400">{t(lang, 'following')}</div>
             </button>
           </div>
 
@@ -308,25 +322,36 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
           ) : (
             <>
               {prof.bio && <p className="text-sm text-gray-600 mt-3 leading-relaxed">{prof.bio}</p>}
-              {prof.website && <a href={prof.website.startsWith('http') ? prof.website : 'https://' + prof.website} target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-xs text-brand font-semibold">🔗 {prof.website}</a>}
+              {prof.website && <a href={prof.website.startsWith('http') ? prof.website : 'https://' + prof.website} target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-xs text-green-600 font-semibold">🔗 {prof.website}</a>}
             </>
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 justify-center mt-4">
+          <div className="flex gap-2 justify-center mt-4 flex-wrap">
             {isMe && !editing && (
               <>
-                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white" onClick={startEdit}>{t(lang, 'editProfile')}</button>
-                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white text-red-400" onClick={onLogout}>{t(lang, 'logout')}</button>
+                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white shadow-sm" onClick={startEdit}>{t(lang, 'editProfile')}</button>
+                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white text-red-400 shadow-sm" onClick={onLogout}>{t(lang, 'logout')}</button>
               </>
             )}
             {!isMe && (
-              <button
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold ${isFollowing ? 'bg-white border border-gray-200 text-gray-600' : 'gradient-btn text-white'}`}
-                onClick={toggleFollow}
-              >
-                {isFollowing ? t(lang, 'unfollow') : t(lang, 'follow')}
-              </button>
+              <>
+                <button
+                  className={`px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm ${isFollowing ? 'bg-white border border-gray-200 text-gray-600' : 'gradient-btn text-white'}`}
+                  onClick={toggleFollow}
+                >
+                  {isFollowing ? t(lang, 'unfollow') : t(lang, 'follow')}
+                </button>
+                {onMessage && (
+                  <button
+                    className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-600 shadow-sm flex items-center gap-1.5"
+                    onClick={() => onMessage(userId, prof.display_name || prof.username)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    {t(lang, 'writeMsg')}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -336,17 +361,17 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
         {recipes.length === 0 ? (
           <div className="text-center py-8"><div className="text-4xl mb-2">📝</div><p className="text-sm text-gray-400">{t(lang, 'noRec')}</p></div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {recipes.map(r => (
-              <div key={r.id} className="bg-white rounded-2xl overflow-hidden border border-gray-200 cursor-pointer" onClick={() => onOpenRecipe(r.id)}>
+              <div key={r.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 cursor-pointer shadow-sm active:scale-95 transition-transform" onClick={() => onOpenRecipe(r.id)}>
                 {r.main_photo_url ? (
-                  <div className="h-24 bg-cover bg-center" style={{ backgroundImage: `url(${r.main_photo_url})` }} />
+                  <div className="h-28 bg-cover bg-center" style={{ backgroundImage: `url(${r.main_photo_url})` }} />
                 ) : (
-                  <div className="h-24 flex items-center justify-center text-4xl" style={{ background: '#fef3e2' }}>🍽️</div>
+                  <div className="h-28 flex items-center justify-center text-4xl" style={{ background: '#f0fdf4' }}>🍽️</div>
                 )}
-                <div className="p-3">
-                  <div className="font-display text-base font-bold">{r.title}</div>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                <div className="p-2.5">
+                  <div className="font-bold text-xs line-clamp-2 leading-snug">{r.title}</div>
+                  <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
                     <span>❤️ {r.likes_count || 0}</span>
                     <span>💬 {r.comments_count || 0}</span>
                   </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { t, UNITS, DISH_TYPES, MEAL_TIMES } from '@/lib/i18n';
+import { t, UNITS, DISH_TYPES, MEAL_TIMES, DIETARY_TAGS, CUISINES } from '@/lib/i18n';
 import { resizeImage, fileToBase64 } from '@/lib/image';
 
 export default function AddRecipe({ supabase, user, profile, lang, recipeLang, canAdd, editRecipe = null, onPublished, onBack }) {
@@ -18,7 +18,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   const [mT, setMT] = useState('');
   const [mDesc, setMDesc] = useState('');
   const [mI, setMI] = useState([{ name: '', amount: '', unit: 'шт' }]);
-  const [mS, setMS] = useState(['']);
+  const [mS, setMS] = useState([{ content: '' }]);
   const [mTips, setMTips] = useState('');
   const [mPrep, setMPrep] = useState('');
   const [mCook, setMCook] = useState('');
@@ -26,15 +26,23 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   const [mCalP, setMCalP] = useState('serving');
   const [mServ, setMServ] = useState('4');
   const [mTags, setMTags] = useState('');
-  const [mDishTypes, setMDishTypes] = useState([]); // array for multi-select
-  const [mMealTimes, setMMealTimes] = useState([]); // array for multi-select
+  const [mDishTypes, setMDishTypes] = useState([]);
+  const [mMealTimes, setMMealTimes] = useState([]);
+  const [mDietary, setMDietary] = useState([]);
+  const [mCuisine, setMCuisine] = useState('');
 
-  // Photos
-  const [photos, setPhotos] = useState([]);           // new photos to upload
-  const [existingPhotos, setExistingPhotos] = useState([]); // existing from DB (edit mode)
+  // Main photo (single)
+  const [mainPhotoFile, setMainPhotoFile] = useState(null);
+  const [mainPhotoPreview, setMainPhotoPreview] = useState('');
+  const [existingMainPhoto, setExistingMainPhoto] = useState(null);
+
+  // Step photos: { [stepIndex]: { file, previewUrl } }
+  const [stepPhotos, setStepPhotos] = useState({});
+
   const [ocrImgs, setOcrImgs] = useState([]);
   const fRef = useRef(null);
   const oRef = useRef(null);
+  const stepPhotoRefs = useRef({});
 
   useEffect(() => {
     if (editRecipe) {
@@ -43,7 +51,9 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       setMI(editRecipe.ingredients?.length > 0
         ? editRecipe.ingredients.map(x => ({ name: x.name || '', amount: String(x.amount || ''), unit: x.unit || 'шт' }))
         : [{ name: '', amount: '', unit: 'шт' }]);
-      setMS(editRecipe.steps?.length > 0 ? editRecipe.steps.map(x => x.content || '') : ['']);
+      setMS(editRecipe.steps?.length > 0
+        ? editRecipe.steps.map(x => ({ content: typeof x === 'string' ? x : (x.content || ''), photo_url: x.photo_url || '' }))
+        : [{ content: '' }]);
       setMTips(editRecipe.tips || '');
       setMPrep(editRecipe.prep_time || '');
       setMCook(editRecipe.cook_time || '');
@@ -51,24 +61,21 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       setMCalP(editRecipe.calories_per || 'serving');
       setMServ(String(editRecipe.servings || 4));
       setMTags((editRecipe.tags || []).join(', '));
-      // Support both array and string for dish_type/meal_time
       const dt = editRecipe.dish_type;
       const mt = editRecipe.meal_time;
       setMDishTypes(Array.isArray(dt) ? dt : (dt ? [dt] : []));
       setMMealTimes(Array.isArray(mt) ? mt : (mt ? [mt] : []));
-      // Load existing photos
+      setMDietary(editRecipe.dietary || []);
+      setMCuisine(editRecipe.cuisine || '');
       if (editRecipe.id) {
-        supabase.from('recipe_photos').select('*').eq('recipe_id', editRecipe.id).order('sort_order')
-          .then(({ data }) => setExistingPhotos(data || []));
+        supabase.from('recipe_photos').select('*').eq('recipe_id', editRecipe.id).eq('is_main', true).maybeSingle()
+          .then(({ data }) => { if (data) setExistingMainPhoto(data); });
       }
     }
   }, []);
 
-  function toggleDishType(dt) {
-    setMDishTypes(prev => prev.includes(dt) ? prev.filter(x => x !== dt) : [...prev, dt]);
-  }
-  function toggleMealTime(mt) {
-    setMMealTimes(prev => prev.includes(mt) ? prev.filter(x => x !== mt) : [...prev, mt]);
+  function toggleArr(setter, val) {
+    setter(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
   }
 
   function cancelRequest() {
@@ -89,7 +96,13 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       });
       const data = await res.json();
       if (data.error) setErr(t(lang, 'parseFail'));
-      else { setPrev(data); setMode('preview'); }
+      else {
+        const normalizedSteps = (data.steps || []).map(s =>
+          typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
+        );
+        setPrev({ ...data, steps: normalizedSteps });
+        setMode('preview');
+      }
     } catch (e) {
       if (e.name !== 'AbortError') setErr(t(lang, 'parseFail'));
     }
@@ -118,41 +131,51 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       });
       const data = await res.json();
       if (data.error) setErr(t(lang, 'parseFail'));
-      else { setPrev(data); setOcrImgs([]); setMode('preview'); }
+      else {
+        const normalizedSteps = (data.steps || []).map(s =>
+          typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
+        );
+        setPrev({ ...data, steps: normalizedSteps });
+        setOcrImgs([]);
+        setMode('preview');
+      }
     } catch (e) {
       if (e.name !== 'AbortError') setErr(t(lang, 'parseFail'));
     }
     setBusy(false); setBMsg('');
   }
 
-  async function addPhotos(e) {
-    const total = photos.length + existingPhotos.length;
-    const files = [...(e.target.files || [])];
-    if (total + files.length > 5) { e.target.value = ''; return; }
+  async function addMainPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
     setBusy(true); setBMsg(t(lang, 'resizing'));
-    const np = [...photos];
-    for (const f of files) {
-      const blob = await resizeImage(f);
-      np.push({ blob, url: URL.createObjectURL(blob), main: total === 0 && np.length === 0 });
-    }
-    setPhotos(np);
+    const blob = await resizeImage(file);
+    setMainPhotoFile(blob);
+    setMainPhotoPreview(URL.createObjectURL(blob));
     setBusy(false); setBMsg('');
     e.target.value = '';
   }
 
-  async function removeExistingPhoto(photoId) {
-    await supabase.from('recipe_photos').delete().eq('id', photoId);
-    setExistingPhotos(existingPhotos.filter(p => p.id !== photoId));
+  async function addStepPhoto(stepIdx, e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const blob = await resizeImage(file);
+    const previewUrl = URL.createObjectURL(blob);
+    setStepPhotos(prev => ({ ...prev, [stepIdx]: { file: blob, previewUrl } }));
+    e.target.value = '';
   }
 
-  async function setExistingMain(photoId) {
-    await supabase.from('recipe_photos').update({ is_main: false }).eq('recipe_id', editRecipe.id);
-    await supabase.from('recipe_photos').update({ is_main: true }).eq('id', photoId);
-    setExistingPhotos(existingPhotos.map(p => ({ ...p, is_main: p.id === photoId })));
+  function removeStepPhoto(stepIdx) {
+    setStepPhotos(prev => {
+      const next = { ...prev };
+      delete next[stepIdx];
+      return next;
+    });
+    setMS(prev => prev.map((s, i) => i === stepIdx ? { ...s, photo_url: '' } : s));
   }
 
   function doManual() {
-    if (!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => x.trim())) return;
+    if (!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => (x.content || x).trim())) return;
     setPrev({
       id: editRecipe?.id,
       title: mT.trim(),
@@ -164,8 +187,16 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       tips: mTips,
       dish_type: mDishTypes.length > 0 ? mDishTypes : null,
       meal_time: mMealTimes.length > 0 ? mMealTimes : null,
+      dietary: mDietary.length > 0 ? mDietary : [],
+      cuisine: mCuisine || '',
       ingredients: mI.filter(x => x.name.trim()).map(x => ({ name: x.name.trim(), amount: parseFloat(x.amount) || 0, unit: x.unit })),
-      steps: mS.filter(x => x.trim()).map(x => ({ title: '', content: x.trim(), timer_seconds: null })),
+      steps: mS.filter(x => (x.content || x).trim()).map((x, origIdx) => ({
+        title: '',
+        content: (typeof x === 'string' ? x : x.content || '').trim(),
+        timer_seconds: null,
+        photo_url: x.photo_url || '',
+        _origIdx: origIdx,
+      })),
     });
     setMode('preview');
   }
@@ -183,23 +214,42 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       calories: prev.calories,
       calories_per: prev.calories_per || 'serving',
       ingredients: prev.ingredients,
-      steps: prev.steps,
       tags: prev.tags || [],
       tips: prev.tips || '',
       dish_type: prev.dish_type || null,
       meal_time: prev.meal_time || null,
+      dietary: prev.dietary || [],
+      cuisine: prev.cuisine || '',
     };
+
+    // Upload step photos first
+    const stepsWithPhotos = await Promise.all((prev.steps || []).map(async (step, i) => {
+      const stepPhotoData = stepPhotos[step._origIdx !== undefined ? step._origIdx : i];
+      if (stepPhotoData?.file) {
+        const recipeId = prev.id || 'new';
+        const path = `${user.id}/${recipeId}/step_${i}_${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, stepPhotoData.file, { contentType: 'image/jpeg' });
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
+          return { ...step, photo_url: publicUrl };
+        }
+      }
+      return { ...step };
+    }));
+
+    recipeData.steps = stepsWithPhotos.map(s => ({ title: s.title || '', content: s.content, timer_seconds: s.timer_seconds || null, photo_url: s.photo_url || null }));
 
     if (prev.id) {
       await supabase.from('recipes').update(recipeData).eq('id', prev.id);
-      for (let i = 0; i < photos.length; i++) {
-        const p = photos[i];
-        const path = `${user.id}/${prev.id}/${Date.now()}_${i}.jpg`;
-        const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
+      if (mainPhotoFile) {
+        if (existingMainPhoto) {
+          await supabase.from('recipe_photos').delete().eq('recipe_id', prev.id).eq('is_main', true);
+        }
+        const path = `${user.id}/${prev.id}/main_${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, mainPhotoFile, { contentType: 'image/jpeg' });
         if (!upErr) {
           const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
-          const isMain = existingPhotos.length === 0 && i === 0;
-          await supabase.from('recipe_photos').insert({ recipe_id: prev.id, url: publicUrl, is_main: isMain, sort_order: 99 + i });
+          await supabase.from('recipe_photos').insert({ recipe_id: prev.id, url: publicUrl, is_main: true, sort_order: 0 });
         }
       }
     } else {
@@ -209,13 +259,12 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
       if (error || !recipe) { setBusy(false); setBMsg(''); return; }
 
-      for (let i = 0; i < photos.length; i++) {
-        const p = photos[i];
-        const path = `${user.id}/${recipe.id}/${Date.now()}_${i}.jpg`;
-        const { error: upErr } = await supabase.storage.from('photos').upload(path, p.blob, { contentType: 'image/jpeg' });
+      if (mainPhotoFile) {
+        const path = `${user.id}/${recipe.id}/main_${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage.from('photos').upload(path, mainPhotoFile, { contentType: 'image/jpeg' });
         if (!upErr) {
           const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
-          await supabase.from('recipe_photos').insert({ recipe_id: recipe.id, url: publicUrl, is_main: p.main, sort_order: i });
+          await supabase.from('recipe_photos').insert({ recipe_id: recipe.id, url: publicUrl, is_main: true, sort_order: 0 });
         }
       }
     }
@@ -228,7 +277,9 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   if (!canAdd) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
       <div className="text-center max-w-xs">
-        <div className="text-6xl mb-5">🍳</div>
+        <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg">
+          <span className="text-2xl">🌿</span>
+        </div>
         <h2 className="font-display text-xl font-extrabold mb-3">{t(lang, 'guestWall')}</h2>
         <p className="text-gray-500 text-sm leading-relaxed mb-6">{t(lang, 'guestWallSub')}</p>
         <button className="px-6 py-3 border border-gray-200 rounded-2xl text-sm font-semibold bg-white" onClick={onBack}>{t(lang, 'back')}</button>
@@ -238,8 +289,8 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
-      <div className="sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
+      <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h1 className="font-display text-xl font-extrabold gradient-text">
@@ -249,13 +300,14 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       </div>
 
       <div className="px-5 pt-4">
+        {/* AI mode */}
         {mode === 'ai' && <>
           <div className="text-center mb-4">
             <div className="text-4xl mb-2">✨</div>
             <p className="text-xs text-gray-500">{t(lang, 'pasteText')}</p>
           </div>
 
-          <div className="border border-gray-200 rounded-2xl p-4 mb-4 bg-white">
+          <div className="border border-gray-200 rounded-2xl p-4 mb-4 bg-white shadow-sm">
             <div className="flex items-center gap-2 font-bold text-sm mb-2">📷 {t(lang, 'ocrTitle')}</div>
             <p className="text-xs text-gray-400 mb-2">{t(lang, 'ocrHint')}</p>
             <input type="file" accept="image/*" multiple ref={oRef} className="hidden" onChange={addOcrImg} />
@@ -276,45 +328,79 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           </div>
 
           <textarea
-            className="w-full min-h-[120px] p-3.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white resize-y leading-relaxed"
+            className="w-full min-h-[120px] p-3.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white resize-y leading-relaxed"
             value={raw}
             onChange={e => setRaw(e.target.value)}
             placeholder={"Борщ\n\nСвёкла - 2 шт\nКартофель - 3 шт\n\n1. Свёклу отварить..."}
           />
 
-          {err && <div className="mt-3 p-3 bg-red-50 rounded-xl text-xs text-red-700">{err}<button className="block mt-2 text-brand font-bold" onClick={() => { setMode('manual'); setErr(''); }}>📝 {t(lang, 'manual')}</button></div>}
+          {err && <div className="mt-3 p-3 bg-red-50 rounded-xl text-xs text-red-700">{err}<button className="block mt-2 text-green-600 font-bold" onClick={() => { setMode('manual'); setErr(''); }}>📝 {t(lang, 'manual')}</button></div>}
 
           {busy ? (
             <div className="flex flex-col items-center py-8 gap-3">
-              <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
+              <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
               <span className="text-sm text-gray-500 font-semibold">{bMsg}</span>
               <button className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 bg-white" onClick={cancelRequest}>{t(lang, 'cancelParse')}</button>
             </div>
           ) : (
             <>
-              <button className="w-full mt-3 py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50" disabled={!raw.trim()} onClick={doParse}>✨ {t(lang, 'parseBtn')}</button>
+              <button className="w-full mt-3 py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm" disabled={!raw.trim()} onClick={doParse}>✨ {t(lang, 'parseBtn')}</button>
               <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('manual')}>{t(lang, 'orManual')}</button>
             </>
           )}
         </>}
 
+        {/* Manual mode */}
         {mode === 'manual' && <>
           <div className="text-center mb-4"><div className="text-4xl mb-2">{isEdit ? '✏️' : '📝'}</div></div>
 
+          {/* Main photo */}
+          <label className="text-xs font-bold text-gray-500 mb-2 block">{t(lang, 'photos')}</label>
+          <input type="file" accept="image/*" ref={fRef} className="hidden" onChange={addMainPhoto} />
+          <div className="mb-4">
+            {(mainPhotoPreview || existingMainPhoto?.url) ? (
+              <div className="relative rounded-2xl overflow-hidden h-40">
+                <img src={mainPhotoPreview || existingMainPhoto?.url} alt="" className="w-full h-full object-cover" />
+                <button
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-sm"
+                  onClick={() => { setMainPhotoFile(null); setMainPhotoPreview(''); setExistingMainPhoto(null); }}
+                >×</button>
+              </div>
+            ) : (
+              <div className="h-32 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer text-gray-400 gap-1 text-xs font-semibold bg-white" onClick={() => fRef.current?.click()}>
+                🖼 {t(lang, 'addPh')}
+              </div>
+            )}
+          </div>
+
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'titleLabel')}</label>
-          <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mT} onChange={e => setMT(e.target.value)} />
+          <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-green-500 bg-white" value={mT} onChange={e => setMT(e.target.value)} />
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dishType')}</label>
           <div className="flex gap-1.5 flex-wrap mb-3">
             {DISH_TYPES.map(dt => (
-              <button key={dt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDishTypes.includes(dt) ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleDishType(dt)}>{dt}</button>
+              <button key={dt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDishTypes.includes(dt) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleArr(setMDishTypes, dt)}>{dt}</button>
             ))}
           </div>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'mealTime')}</label>
           <div className="flex gap-1.5 flex-wrap mb-3">
             {MEAL_TIMES.map(mt => (
-              <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTimes.includes(mt) ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleMealTime(mt)}>{mt}</button>
+              <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTimes.includes(mt) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleArr(setMMealTimes, mt)}>{mt}</button>
+            ))}
+          </div>
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dietary')}</label>
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {DIETARY_TAGS.map(d => (
+              <button key={d} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mDietary.includes(d) ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleArr(setMDietary, d)}>{d}</button>
+            ))}
+          </div>
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'cuisine')}</label>
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {CUISINES.map(c => (
+              <button key={c} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mCuisine === c ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCuisine(mCuisine === c ? '' : c)}>{c}</button>
             ))}
           </div>
 
@@ -322,9 +408,11 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             <div className="flex gap-2 items-center"><span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'servings')}</span><input className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" type="number" min="1" value={mServ} onChange={e => setMServ(e.target.value)} /></div>
             <div className="flex gap-2 items-center"><span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'prepTime')}</span><input className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" value={mPrep} onChange={e => setMPrep(e.target.value)} placeholder={t(lang, 'timeP')} /></div>
             <div className="flex gap-2 items-center"><span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'cookTime')}</span><input className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" value={mCook} onChange={e => setMCook(e.target.value)} placeholder={t(lang, 'timeP')} /></div>
-            <div className="flex gap-2 items-center"><span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'cal')}</span><input className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" type="number" value={mCal} onChange={e => setMCal(e.target.value)} placeholder={t(lang, 'kcal')} />
-              <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='serving'?'bg-gray-800 text-white border-gray-800':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('serving')}>{t(lang, 'calP')}</button>
-              <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='total'?'bg-gray-800 text-white border-gray-800':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('total')}>{t(lang, 'calT')}</button>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs font-semibold text-gray-500 w-[70px]">{t(lang, 'cal')}</span>
+              <input className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" type="number" value={mCal} onChange={e => setMCal(e.target.value)} placeholder={t(lang, 'kcal')} />
+              <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='serving'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('serving')}>{t(lang, 'calP')}</button>
+              <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='total'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('total')}>{t(lang, 'calT')}</button>
             </div>
           </div>
 
@@ -342,64 +430,77 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <button className="w-full py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500 mb-4" onClick={() => setMI([...mI, { name: '', amount: '', unit: 'шт' }])}>{t(lang, 'addIng')}</button>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'steps')}</label>
-          {mS.map((x, i) => (
-            <div key={i} className="flex gap-2 items-start mb-2">
-              <div className="w-7 h-7 rounded-lg bg-gray-800 text-white flex items-center justify-center text-xs font-extrabold flex-shrink-0 mt-2">{i + 1}</div>
-              <textarea className="flex-1 min-h-[60px] p-2.5 border border-gray-200 rounded-xl text-xs outline-none bg-white resize-y" value={x} onChange={e => setMS(mS.map((v,j) => j===i ? e.target.value : v))} placeholder={t(lang, 'stepP')} />
-              {mS.length > 1 && <button className="text-gray-400 text-lg px-1 mt-2" onClick={() => setMS(mS.filter((_,j) => j !== i))}>×</button>}
-            </div>
-          ))}
-          <button className="w-full py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500 mb-4" onClick={() => setMS([...mS, ''])}>{t(lang, 'addStep')}</button>
+          {mS.map((x, i) => {
+            const stepContent = typeof x === 'string' ? x : (x.content || '');
+            const stepPhotoData = stepPhotos[i];
+            const existingStepPhoto = typeof x === 'object' ? x.photo_url : '';
+            if (!stepPhotoRefs.current[i]) stepPhotoRefs.current[i] = null;
+            return (
+              <div key={i} className="mb-3 bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                {(stepPhotoData?.previewUrl || existingStepPhoto) && (
+                  <div className="relative">
+                    <img src={stepPhotoData?.previewUrl || existingStepPhoto} alt="" className="w-full h-36 object-cover" />
+                    <button className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center text-xs" onClick={() => removeStepPhoto(i)}>×</button>
+                  </div>
+                )}
+                <div className="flex gap-2 items-start p-3">
+                  <div className="w-7 h-7 rounded-lg bg-gray-900 text-white flex items-center justify-center text-xs font-extrabold flex-shrink-0 mt-1">{i + 1}</div>
+                  <textarea
+                    className="flex-1 min-h-[60px] p-2 border border-gray-200 rounded-xl text-xs outline-none bg-gray-50 resize-y"
+                    value={stepContent}
+                    onChange={e => setMS(mS.map((v, j) => j === i ? { ...(typeof v === 'object' ? v : { content: v }), content: e.target.value } : v))}
+                    placeholder={t(lang, 'stepP')}
+                  />
+                  {mS.length > 1 && <button className="text-gray-400 text-lg px-1 mt-1" onClick={() => { setMS(mS.filter((_,j) => j !== i)); setStepPhotos(prev => { const n = {}; Object.entries(prev).forEach(([k,v]) => { const ki = parseInt(k); if (ki < i) n[ki] = v; else if (ki > i) n[ki-1] = v; }); return n; }); }}>×</button>}
+                </div>
+                <div className="px-3 pb-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={el => stepPhotoRefs.current[i] = el}
+                    onChange={e => addStepPhoto(i, e)}
+                  />
+                  {!stepPhotoData && !existingStepPhoto && (
+                    <button className="text-xs text-gray-400 font-semibold flex items-center gap-1" onClick={() => stepPhotoRefs.current[i]?.click()}>
+                      🖼 {t(lang, 'addPhStep')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <button className="w-full py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500 mb-4" onClick={() => setMS([...mS, { content: '' }])}>{t(lang, 'addStep')}</button>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'tips')}</label>
           <textarea className="w-full min-h-[80px] p-3 border border-gray-200 rounded-2xl text-sm outline-none bg-white resize-y mb-3" value={mTips} onChange={e => setMTips(e.target.value)} placeholder={t(lang, 'tipsP')} />
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">Теги (через запятую)</label>
-          <input className="w-full mb-4 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
+          <input className="w-full mb-5 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-green-500 bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
 
-          <button className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50" disabled={!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => x.trim())} onClick={doManual}>{t(lang, 'prevBtn')}</button>
+          <button
+            className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm"
+            disabled={!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => (x.content || x).trim())}
+            onClick={doManual}
+          >{t(lang, 'prevBtn')}</button>
           {!isEdit && <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>}
         </>}
 
+        {/* Preview mode */}
         {mode === 'preview' && prev && <>
           <div className="text-center mb-4"><div className="text-4xl mb-2">👀</div><p className="text-xs text-gray-500">{t(lang, 'check')}</p></div>
 
-          {/* Photos */}
-          <label className="text-xs font-bold text-gray-500 mb-2 block">{t(lang, 'photos')}</label>
-          <input type="file" accept="image/*" multiple ref={fRef} className="hidden" onChange={addPhotos} />
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {/* Existing photos (edit mode) */}
-            {existingPhotos.map((p) => (
-              <div key={p.id} className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer ${p.is_main ? 'border-brand' : 'border-transparent'}`} onClick={() => setExistingMain(p.id)}>
-                <img src={p.url} alt="" className="w-full h-full object-cover" />
-                {p.is_main && <div className="absolute top-1 left-1 bg-brand text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">★</div>}
-                <button className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-xs" onClick={e => { e.stopPropagation(); removeExistingPhoto(p.id); }}>×</button>
-              </div>
-            ))}
-            {/* New photos */}
-            {photos.map((p, i) => (
-              <div key={`new-${i}`} className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer ${p.main && existingPhotos.length === 0 ? 'border-brand' : 'border-dashed border-gray-300'}`} onClick={() => setPhotos(photos.map((v,j) => ({...v, main: j===i})))}>
-                <img src={p.url} alt="" className="w-full h-full object-cover" />
-                {p.main && existingPhotos.length === 0 && <div className="absolute top-1 left-1 bg-brand text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">★</div>}
-                <button className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-xs" onClick={e => { e.stopPropagation(); const np = photos.filter((_,j)=>j!==i); if(np.length&&!np.some(v=>v.main))np[0].main=true; setPhotos(np); }}>×</button>
-              </div>
-            ))}
-            {existingPhotos.length + photos.length < 5 && (
-              <div className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer text-gray-400 gap-1 text-[11px] font-semibold" onClick={() => fRef.current?.click()}>
-                🖼 {t(lang, 'addPh')}
-              </div>
-            )}
-          </div>
+          {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
 
-          {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
             <h3 className="font-display text-xl font-bold mb-2">{prev.title}</h3>
             {prev.description && <p className="text-xs text-gray-500 mb-3">{prev.description}</p>}
             <div className="flex gap-1.5 flex-wrap mb-2">
-              {(prev.dish_type || []).map(dt => <span key={dt} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{dt}</span>)}
-              {(prev.meal_time || []).map(mt => <span key={mt} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-700 font-semibold">{mt}</span>)}
-              {(prev.tags || []).map(tg => <span key={tg} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 font-semibold">{tg}</span>)}
+              {(prev.dish_type || []).map(dt => <span key={dt} className="text-[11px] px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 font-semibold border border-green-100">{dt}</span>)}
+              {(prev.meal_time || []).map(mt => <span key={mt} className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-100">{mt}</span>)}
+              {(prev.dietary || []).map(d => <span key={d} className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">{d}</span>)}
+              {prev.cuisine && <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">{prev.cuisine}</span>}
+              {(prev.tags || []).map(tg => <span key={tg} className="text-[11px] px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold">{tg}</span>)}
             </div>
             <div className="flex gap-3 text-xs text-gray-400 mb-3 flex-wrap">
               {prev.prep_time && <span>🔪 {prev.prep_time}</span>}
@@ -408,15 +509,25 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
               {prev.calories && <span>🔥 {prev.calories} {t(lang, 'kcal')}</span>}
             </div>
             <h4 className="font-bold text-sm mb-2">{t(lang, 'ingredients')}</h4>
-            {(prev.ingredients || []).map((g, i) => <div key={i} className="flex gap-2 py-1.5 border-b border-dashed border-gray-100 text-xs"><span className="font-bold min-w-[50px] text-amber-700">{g.amount || ''} {g.unit || ''}</span><span>{g.name}</span></div>)}
+            {(prev.ingredients || []).map((g, i) => <div key={i} className="flex gap-2 py-1.5 border-b border-dashed border-gray-100 text-xs"><span className="font-bold min-w-[50px] text-green-700">{g.amount || ''} {g.unit || ''}</span><span>{g.name}</span></div>)}
             <h4 className="font-bold text-sm mt-3 mb-2">{t(lang, 'steps')}</h4>
-            {(prev.steps || []).map((s, i) => <p key={i} className="text-xs text-gray-500 mb-1"><strong>{i + 1}.</strong> {s.content}</p>)}
-            {prev.tips && <div className="bg-yellow-50 rounded-xl p-3 mt-3 text-xs text-yellow-800">{prev.tips}</div>}
+            {(prev.steps || []).map((s, i) => {
+              const stepPhotoData = stepPhotos[s._origIdx !== undefined ? s._origIdx : i];
+              return (
+                <div key={i} className="mb-2">
+                  {(stepPhotoData?.previewUrl || s.photo_url) && (
+                    <img src={stepPhotoData?.previewUrl || s.photo_url} alt="" className="w-full h-28 object-cover rounded-xl mb-1" />
+                  )}
+                  <p className="text-xs text-gray-500"><strong>{i + 1}.</strong> {s.content}</p>
+                </div>
+              );
+            })}
+            {prev.tips && <div className="bg-amber-50 rounded-xl p-3 mt-3 text-xs text-amber-800">{prev.tips}</div>}
           </div>
 
           <div className="flex gap-2">
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#faf8f5] border border-gray-200" onClick={() => setMode('manual')}>← {t(lang, 'back')}</button>
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-700 text-white" onClick={publish} disabled={busy}>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={() => setMode('manual')}>← {t(lang, 'back')}</button>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-700 text-white shadow-sm" onClick={publish} disabled={busy}>
               {isEdit ? t(lang, 'saveChanges') : t(lang, 'publish') + ' 🚀'}
             </button>
           </div>

@@ -22,16 +22,16 @@ const translations = {
     servings: 'Порции', serv: 'порц.',
     myRec: 'Мои рецепты', noRec: 'Пока нет рецептов', chName: 'Сменить имя',
     settings: 'Настройки', uiLang: 'Язык интерфейса', rcpLang: 'Язык рецептов',
-    photos: 'Фотографии блюда', addPh: 'Добавить фото',
+    photos: 'Главное фото блюда', addPh: 'Добавить фото',
     ocrTitle: '📷 Распознать рецепт с фото',
     ocrHint: 'Загрузи до 2 фото рецепта (книга, экран, рукопись)',
     ocrBtn: 'Распознать', ocrParsing: 'Распознаю текст с фото...',
-    maxPh: 'Максимум 5 фото', maxOcr: 'Максимум 2 фото',
+    maxPh: 'Максимум 1 фото', maxOcr: 'Максимум 2 фото',
     tips: 'Советы и заметки', tipsP: 'Советы, секреты, с чем подавать...',
     prepTime: 'Время подготовки', cookTime: 'Время приготовления',
     timeP: 'напр. 30 мин',
     cal: 'Калории', calP: 'на порцию', calT: 'на всё блюдо', kcal: 'ккал',
-    cantAdd: 'Добавлять рецепты могут коки, администраторы и создатели',
+    cantAdd: 'Добавлять рецепты могут только Premium-пользователи',
     ingName: 'Название', amt: 'Кол-во', stepP: 'Опишите шаг...',
     prevBtn: 'Предпросмотр →', resizing: 'Сжимаю фото...',
     login: 'Войти', loginGoogle: 'Войти через Google', logout: 'Выйти',
@@ -48,6 +48,7 @@ const translations = {
     now: 'сейчас', min: 'мин', hr: 'ч', dy: 'дн',
     rcpC: 'рецепты', favC: 'избранное', likC: 'лайков',
     dishType: 'Тип блюда', mealTime: 'Приём пищи',
+    dietary: 'Питание', cuisine: 'Кухня',
     exportPdf: 'Экспорт в PDF', printPreview: 'Предпросмотр', printNormal: 'Обычный', printCompact: 'Компактный',
     printBtn: 'Сохранить как PDF', printHint: 'Нажми "Сохранить как PDF" в диалоге печати',
     changeRole: 'Изменить роль', blockUser: 'Заблокировать', reportUser: 'Пожаловаться', shareProfile: 'Поделиться профилем',
@@ -59,7 +60,18 @@ const translations = {
     incompleteProfile: 'Заполни профиль чтобы продолжить', goToProfile: 'Заполнить профиль',
     filters: 'Фильтры', clearFilters: 'Сбросить', searchProfiles: 'Поиск профиля (@username)...',
     noResults: 'Ничего не найдено', profiles: 'Профили',
-    guestWall: 'Добавление рецептов пока доступно не всем', guestWallSub: 'Мы постепенно открываем эту возможность для всех пользователей. Следи за обновлениями!',
+    guestWall: 'Только для Pestogram Premium',
+    guestWallSub: 'Добавление рецептов пока доступно только премиум-пользователям. Скоро откроем для всех — следи за обновлениями!',
+    premiumModal: 'Только для Premium',
+    premiumModalSub: 'Добавление рецептов сейчас доступно только премиум-пользователям. Совсем скоро откроем для всех!',
+    messages: 'Сообщения', newMsg: 'Новое сообщение',
+    noConversations: 'Нет сообщений', startConv: 'Начни общение с авторами рецептов',
+    typeMessage: 'Написать...', msgSend: 'Отправить',
+    msgPrivacy: 'Кто может писать мне',
+    msgEveryone: 'Все', msgFollowers: 'Мои подписчики', msgFollowing: 'Мои подписки', msgNobody: 'Никто',
+    writeMsg: 'Написать', cantMsg: 'Этот пользователь ограничил сообщения',
+    addPhStep: 'Фото к шагу', photoStep: 'Фото шага',
+    skip: 'Пропустить',
   },
   en: {
     feed: 'Feed', favs: 'Favorites', profile: 'Profile', recipe: 'Recipe',
@@ -84,16 +96,16 @@ const translations = {
     servings: 'Servings', serv: 'serv.',
     myRec: 'My recipes', noRec: 'No recipes yet', chName: 'Change name',
     settings: 'Settings', uiLang: 'Interface language', rcpLang: 'Recipe language',
-    photos: 'Dish photos', addPh: 'Add photo',
+    photos: 'Main dish photo', addPh: 'Add photo',
     ocrTitle: '📷 Recognize recipe from photo',
     ocrHint: 'Upload up to 2 photos of a recipe',
     ocrBtn: 'Recognize', ocrParsing: 'Reading text from photo...',
-    maxPh: 'Max 5 photos', maxOcr: 'Max 2 photos',
+    maxPh: 'Max 1 photo', maxOcr: 'Max 2 photos',
     tips: 'Tips & notes', tipsP: 'Tips, secrets, serving suggestions...',
     prepTime: 'Prep time', cookTime: 'Cook time',
     timeP: 'e.g. 30 min',
     cal: 'Calories', calP: 'per serving', calT: 'total', kcal: 'kcal',
-    cantAdd: 'Only cooks, admins and creators can add recipes',
+    cantAdd: 'Only Premium users can add recipes',
     ingName: 'Name', amt: 'Amount', stepP: 'Describe the step...',
     prevBtn: 'Preview →', resizing: 'Resizing photos...',
     login: 'Sign in', loginGoogle: 'Sign in with Google', logout: 'Sign out',
@@ -110,6 +122,7 @@ const translations = {
     now: 'now', min: 'min', hr: 'h', dy: 'd',
     rcpC: 'recipes', favC: 'favorites', likC: 'likes',
     dishType: 'Dish type', mealTime: 'Meal time',
+    dietary: 'Dietary', cuisine: 'Cuisine',
     exportPdf: 'Export PDF', printPreview: 'Preview', printNormal: 'Normal', printCompact: 'Compact',
     printBtn: 'Save as PDF', printHint: 'Choose "Save as PDF" in the print dialog',
     changeRole: 'Change role', blockUser: 'Block', reportUser: 'Report', shareProfile: 'Share profile',
@@ -121,7 +134,18 @@ const translations = {
     incompleteProfile: 'Please fill in your profile to continue', goToProfile: 'Fill in profile',
     filters: 'Filters', clearFilters: 'Clear', searchProfiles: 'Search profile (@username)...',
     noResults: 'Nothing found', profiles: 'Profiles',
-    guestWall: 'Adding recipes is not available to everyone yet', guestWallSub: 'We are gradually opening this feature to all users. Stay tuned!',
+    guestWall: 'Pestogram Premium only',
+    guestWallSub: 'Recipe adding is currently available for premium users only. Opening to everyone soon!',
+    premiumModal: 'Premium only',
+    premiumModalSub: 'Adding recipes is currently for premium users only. Coming to everyone soon!',
+    messages: 'Messages', newMsg: 'New message',
+    noConversations: 'No messages', startConv: 'Start chatting with recipe authors',
+    typeMessage: 'Message...', msgSend: 'Send',
+    msgPrivacy: 'Who can message me',
+    msgEveryone: 'Everyone', msgFollowers: 'My followers', msgFollowing: 'My following', msgNobody: 'Nobody',
+    writeMsg: 'Message', cantMsg: 'This user has restricted messages',
+    addPhStep: 'Step photo', photoStep: 'Step photo',
+    skip: 'Skip',
   },
 };
 
@@ -150,5 +174,18 @@ export const LANGS = [
 
 export const UNITS = ['г','кг','мл','л','шт','ч.л.','ст.л.','стакан','щепотка','по вкусу','зубчик','пучок',''];
 
-export const DISH_TYPES = ['Напиток', 'Закуска', 'Салат', 'Суп', 'Основное блюдо', 'Гарнир', 'Десерт', 'Выпечка'];
+export const DISH_TYPES = [
+  'Напиток', 'Закуска', 'Салат', 'Суп', 'Основное блюдо',
+  'Гарнир', 'Десерт', 'Выпечка', 'Каша', 'Смузи / йогурт',
+];
+
 export const MEAL_TIMES = ['Завтрак', 'Обед', 'Ужин', 'Перекус'];
+
+export const DIETARY_TAGS = ['Веганское', 'Вегетарианское', 'ПП', 'Кошерное', 'Халяль'];
+
+export const CUISINES = [
+  'Французская', 'Итальянская', 'Русская', 'Азиатская',
+  'Испанская', 'Португальская', 'Европейская', 'Американская',
+  'Мексиканская', 'Японская', 'Китайская', 'Индийская',
+  'Ближневосточная', 'Средиземноморская',
+];

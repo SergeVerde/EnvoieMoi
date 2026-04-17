@@ -4,12 +4,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: { DEFAULT: '#d97706', dark: '#b45309', light: '#fef3e2' },
+        brand: { DEFAULT: '#16a34a', dark: '#15803d', light: '#f0fdf4' },
         danger: '#e74c3c',
       },
       fontFamily: {
         display: ['Playfair Display', 'serif'],
-        body: ['Nunito', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+      },
+      borderWidth: {
+        '3': '3px',
       },
     },
   },

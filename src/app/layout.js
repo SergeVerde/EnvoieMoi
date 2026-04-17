@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'moimi',
-  description: 'Покажи свой рецепт',
+  title: 'Pestogram',
+  description: 'Социальная сеть рецептов',
 };
 
 export default function RootLayout({ children }) {

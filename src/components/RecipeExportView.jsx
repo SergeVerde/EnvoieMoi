@@ -17,9 +17,9 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
-      {/* Controls — hidden on print */}
-      <div className="no-print sticky top-0 bg-[#faf8f5] z-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center" onClick={onBack}>
+      {/* Controls hidden on print */}
+      <div className="no-print sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h1 className="font-display text-xl font-extrabold gradient-text">{t(lang, 'printPreview')}</h1>
@@ -29,23 +29,23 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
       <div className="no-print px-5 pt-4 pb-3 flex items-center gap-3">
         <div className="flex rounded-xl overflow-hidden border border-gray-200 flex-1">
           <button
-            className={`flex-1 py-2 text-xs font-bold ${!compact ? 'bg-gray-800 text-white' : 'bg-white text-gray-500'}`}
+            className={`flex-1 py-2 text-xs font-bold ${!compact ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}
             onClick={() => setCompact(false)}
           >{t(lang, 'printNormal')}</button>
           <button
-            className={`flex-1 py-2 text-xs font-bold ${compact ? 'bg-gray-800 text-white' : 'bg-white text-gray-500'}`}
+            className={`flex-1 py-2 text-xs font-bold ${compact ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}
             onClick={() => setCompact(true)}
           >{t(lang, 'printCompact')} (A4)</button>
         </div>
         <button
-          className="px-4 py-2 gradient-btn text-white rounded-xl text-xs font-bold whitespace-nowrap"
+          className="px-4 py-2 gradient-btn text-white rounded-xl text-xs font-bold whitespace-nowrap shadow-sm"
           onClick={doPrint}
         >🖨 {t(lang, 'printBtn')}</button>
       </div>
 
       <p className="no-print text-center text-xs text-gray-400 mb-4">{t(lang, 'printHint')}</p>
 
-      {/* Recipe content — this is what gets printed */}
+      {/* Recipe content — printed */}
       <div className={`recipe-print ${compact ? 'compact' : ''} px-6 pt-2`} id="recipe-print-content">
 
         {/* Header with photo */}
@@ -68,6 +68,7 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
                 r.calories && `🔥 ${r.calories} ккал`,
                 r.dish_type && (Array.isArray(r.dish_type) ? r.dish_type.join(', ') : r.dish_type),
                 r.meal_time && (Array.isArray(r.meal_time) ? r.meal_time.join(', ') : r.meal_time),
+                r.cuisine && r.cuisine,
               ].filter(Boolean).join('  ·  ')}
             </p>
             {(r.tags || []).length > 0 && (
@@ -82,7 +83,7 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
           <tbody>
             {(r.ingredients || []).map((ing, i) => (
               <tr key={i} style={{ borderBottom: '1px dashed #eee' }}>
-                <td style={{ width: '30%', color: '#b45309', fontWeight: 'bold', padding: '3pt 0' }}>
+                <td style={{ width: '30%', color: '#166534', fontWeight: 'bold', padding: '3pt 0' }}>
                   {ing.amount ? `${ing.amount} ${ing.unit || ''}`.trim() : ''}
                 </td>
                 <td style={{ padding: '3pt 0' }}>{ing.name}</td>
@@ -95,9 +96,19 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
         <h2>{t(lang, 'steps')}</h2>
         <ol style={{ paddingLeft: '0', listStyle: 'none', marginBottom: '4pt' }}>
           {(r.steps || []).map((step, i) => (
-            <li key={i} style={{ display: 'flex', gap: '8pt', marginBottom: '6pt' }}>
-              <span style={{ background: '#2d2a26', color: 'white', borderRadius: '4px', width: '18pt', height: '18pt', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '9pt', flexShrink: 0 }}>{i + 1}</span>
-              <p style={{ margin: 0 }}>{step.content}</p>
+            <li key={i} className="step-with-photo" style={{ display: 'flex', gap: '8pt', marginBottom: compact ? '4pt' : '8pt', alignItems: 'flex-start' }}>
+              {step.photo_url && (
+                <img
+                  src={step.photo_url}
+                  alt=""
+                  className="step-photo-print"
+                  style={{ width: compact ? '48pt' : '60pt', height: compact ? '48pt' : '60pt', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }}
+                />
+              )}
+              <div style={{ flex: 1, display: 'flex', gap: '6pt', alignItems: 'flex-start' }}>
+                <span style={{ background: '#1a1917', color: 'white', borderRadius: '4px', width: '18pt', height: '18pt', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '9pt', flexShrink: 0 }}>{i + 1}</span>
+                <p style={{ margin: 0 }}>{step.content}</p>
+              </div>
             </li>
           ))}
         </ol>
@@ -112,7 +123,7 @@ export default function RecipeExportView({ recipe, photos, lang, onBack }) {
 
         {/* Footer */}
         <p style={{ marginTop: '16pt', fontSize: '8pt', color: '#aaa', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '8pt' }}>
-          moimi — социальная сеть рецептов
+          Pestogram — социальная сеть рецептов
         </p>
       </div>
     </div>

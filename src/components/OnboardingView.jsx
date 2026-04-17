@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { t } from '@/lib/i18n';
 
-export default function OnboardingView({ supabase, user, profile, lang, onComplete }) {
+export default function OnboardingView({ supabase, user, profile, lang, onComplete, onSkip }) {
   const [username, setUsername] = useState(profile?.username || '');
   const [age, setAge] = useState('');
   const [usernameStatus, setUsernameStatus] = useState(null); // null | 'checking' | 'ok' | 'taken' | 'short'
@@ -98,6 +98,9 @@ export default function OnboardingView({ supabase, user, profile, lang, onComple
           >
             {saving ? '...' : t(lang, 'continueLbl')} 🚀
           </button>
+          {onSkip && (
+            <button onClick={onSkip} className="block mx-auto mt-3 text-xs text-gray-400">{t(lang, 'skip')}</button>
+          )}
         </div>
       </div>
     </div>
