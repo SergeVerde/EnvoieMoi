@@ -4,7 +4,7 @@ import { t, LANGS } from '@/lib/i18n';
 
 const MSG_PRIVACY_OPTIONS = [
   { key: 'everyone', labelKey: 'msgEveryone' },
-  { key: 'followers', labelKey: 'msgFollowers' },
+  { key: 'followingAndFollowers', labelKey: 'msgFollowingAndFollowers' },
   { key: 'following', labelKey: 'msgFollowing' },
   { key: 'nobody', labelKey: 'msgNobody' },
 ];

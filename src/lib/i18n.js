@@ -1,7 +1,7 @@
 const translations = {
   ru: {
     feed: 'Лента', favs: 'Избранное', profile: 'Профиль', recipe: 'Рецепт',
-    search: 'Поиск рецептов...', all: 'все',
+    search: 'Поиск рецептов или @автора...', all: 'все',
     empty: 'Нет рецептов', emptyFav: 'Пока пусто',
     addFirst: 'Добавь первый рецепт!', saveFav: 'Нажми закладку чтобы сохранить',
     addRecipe: 'Добавить рецепт', pasteText: 'Вставь текст или загрузи фото рецепта',
@@ -68,14 +68,14 @@ const translations = {
     noConversations: 'Нет сообщений', startConv: 'Начни общение с авторами рецептов',
     typeMessage: 'Написать...', msgSend: 'Отправить',
     msgPrivacy: 'Кто может писать мне',
-    msgEveryone: 'Все', msgFollowers: 'Мои подписчики', msgFollowing: 'Мои подписки', msgNobody: 'Никто',
+    msgEveryone: 'Все', msgFollowers: 'Мои подписчики', msgFollowing: 'Мои подписки', msgFollowingAndFollowers: 'Подписки и подписчики', msgNobody: 'Никто',
     writeMsg: 'Написать', cantMsg: 'Этот пользователь ограничил сообщения',
     addPhStep: 'Фото к шагу', photoStep: 'Фото шага',
     skip: 'Пропустить',
   },
   en: {
     feed: 'Feed', favs: 'Favorites', profile: 'Profile', recipe: 'Recipe',
-    search: 'Search recipes...', all: 'all',
+    search: 'Search recipes or @author...', all: 'all',
     empty: 'No recipes', emptyFav: 'Nothing yet',
     addFirst: 'Add your first recipe!', saveFav: 'Tap bookmark to save',
     addRecipe: 'Add recipe', pasteText: 'Paste recipe text or upload a photo',
@@ -142,7 +142,7 @@ const translations = {
     noConversations: 'No messages', startConv: 'Start chatting with recipe authors',
     typeMessage: 'Message...', msgSend: 'Send',
     msgPrivacy: 'Who can message me',
-    msgEveryone: 'Everyone', msgFollowers: 'My followers', msgFollowing: 'My following', msgNobody: 'Nobody',
+    msgEveryone: 'Everyone', msgFollowers: 'My followers', msgFollowing: 'My following', msgFollowingAndFollowers: 'Following & followers', msgNobody: 'Nobody',
     writeMsg: 'Message', cantMsg: 'This user has restricted messages',
     addPhStep: 'Step photo', photoStep: 'Step photo',
     skip: 'Skip',
@@ -177,6 +177,7 @@ export const UNITS = ['г','кг','мл','л','шт','ч.л.','ст.л.','ста
 export const DISH_TYPES = [
   'Напиток', 'Закуска', 'Салат', 'Суп', 'Основное блюдо',
   'Гарнир', 'Десерт', 'Выпечка', 'Каша', 'Смузи / йогурт',
+  'Соус', 'Другое',
 ];
 
 export const MEAL_TIMES = ['Завтрак', 'Обед', 'Ужин', 'Перекус'];

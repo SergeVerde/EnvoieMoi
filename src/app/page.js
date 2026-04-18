@@ -44,6 +44,7 @@ export default function Home() {
   const [chatOtherUserId, setChatOtherUserId] = useState(null);
   const [chatOtherName, setChatOtherName] = useState('');
   const [chatOtherAvatar, setChatOtherAvatar] = useState('');
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const L = settings.ui_lang;
   const canAdd = ['cook', 'admin', 'creator', 'premium'].includes(profile?.role);
@@ -68,6 +69,24 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('unread-messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        if (payload.new.sender_id !== user.id) {
+          setUnreadMessages(n => n + 1);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        if (payload.new.read_at && !payload.old.read_at && payload.new.sender_id !== user.id) {
+          setUnreadMessages(n => Math.max(0, n - 1));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   useEffect(() => {
     if (!isProfileSearch || search.length < 2) { setProfileResults([]); return; }
@@ -104,7 +123,23 @@ export default function Home() {
     setLikeIds((likesRes.data || []).map(l => l.recipe_id));
 
     await loadRecipes();
+    loadUnreadCount(userId);
     setLoading(false);
+  }
+
+  async function loadUnreadCount(uid) {
+    const { data: convs } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
+    if (!convs?.length) { setUnreadMessages(0); return; }
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .neq('sender_id', uid)
+      .is('read_at', null)
+      .in('conversation_id', convs.map(c => c.id));
+    setUnreadMessages(count || 0);
   }
 
   async function loadRecipes() {
@@ -187,7 +222,7 @@ export default function Home() {
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-      <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+      <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
     </div>
   );
 
@@ -272,6 +307,7 @@ export default function Home() {
       lang={L}
       onBack={() => { setScreen('feed'); setViewUserId(null); }}
       onOpenRecipe={openRecipe}
+      onOpenProfile={openProfile}
       onSettings={() => setScreen('settings')}
       onLogout={async () => { await supabase.auth.signOut(); setUser(null); setProfile(null); }}
       setProfile={setProfile}
@@ -508,8 +544,9 @@ export default function Home() {
         onFeed={() => { setScreen('feed'); setFilter(null); }}
         onFavs={() => { setScreen('favorites'); setFilter(null); }}
         onAdd={handleAddClick}
-        onMessages={() => setScreen('messages')}
+        onMessages={() => { setScreen('messages'); setUnreadMessages(0); }}
         onProfile={() => openProfile(user.id)}
+        unreadMessages={unreadMessages}
       />
     </div>
   );

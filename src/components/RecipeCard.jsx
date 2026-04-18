@@ -33,7 +33,7 @@ export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike,
           r.cuisine) && (
           <div className="flex gap-1.5 flex-wrap mb-2.5">
             {(Array.isArray(r.dish_type) ? r.dish_type : r.dish_type ? [r.dish_type] : []).slice(0,2).map(dt => (
-              <span key={dt} className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-semibold border border-green-100">{dt}</span>
+              <span key={dt} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand font-semibold border border-brand/20">{dt}</span>
             ))}
             {(r.dietary || []).slice(0,1).map(d => (
               <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">{d}</span>

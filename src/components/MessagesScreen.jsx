@@ -38,14 +38,16 @@ export default function MessagesScreen({ supabase, user, lang, onOpenChat, onBac
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-      <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+      <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
     </div>
   );
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-24">
       <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-        <div className="w-10" />
+        <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onBack}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
         <h1 className="font-display text-xl font-extrabold gradient-text">{t(lang, 'messages')}</h1>
         <div className="w-10" />
       </div>

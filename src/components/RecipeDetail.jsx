@@ -18,7 +18,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
   const [mult, setMult] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lightboxIdx, setLightboxIdx] = useState(null);
-  const [replyTo, setReplyTo] = useState(null);
+  const [replyTo, setReplyTo] = useState(null); // { id, username }
   const commentRef = useRef(null);
 
   useEffect(() => { load(); }, [recipeId]);
@@ -41,7 +41,12 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
   async function addComment() {
     if (!newComment.trim()) return;
-    await supabase.from('comments').insert({ recipe_id: recipeId, user_id: user.id, text: newComment.trim() });
+    await supabase.from('comments').insert({
+      recipe_id: recipeId,
+      user_id: user.id,
+      text: newComment.trim(),
+      parent_id: replyTo?.id || null,
+    });
     setNewComment('');
     setReplyTo(null);
     load();
@@ -58,8 +63,9 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
       ['admin', 'creator'].includes(userProfile?.role);
   }
 
-  function handleReply(username) {
-    setReplyTo(username);
+  function handleReply(comment) {
+    const username = comment.profiles?.display_name || comment.profiles?.username;
+    setReplyTo({ id: comment.id, username });
     setNewComment(`@${username} `);
     setTimeout(() => commentRef.current?.focus(), 50);
   }
@@ -72,7 +78,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-      <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+      <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
     </div>
   );
 
@@ -131,7 +137,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
           (r.tags || []).length > 0) && (
           <div className="flex gap-1.5 flex-wrap mb-4">
             {(Array.isArray(r.dish_type) ? r.dish_type : r.dish_type ? [r.dish_type] : []).map(dt => (
-              <span key={dt} className="text-[11px] px-2.5 py-1 rounded-full bg-green-50 text-green-700 font-semibold border border-green-100">{dt}</span>
+              <span key={dt} className="text-[11px] px-2.5 py-1 rounded-full bg-brand-light text-brand font-semibold border border-brand/20">{dt}</span>
             ))}
             {(Array.isArray(r.meal_time) ? r.meal_time : r.meal_time ? [r.meal_time] : []).map(mt => (
               <span key={mt} className="text-[11px] px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-100">{mt}</span>
@@ -202,7 +208,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
             const amt = ing.amount ? Math.round(ing.amount * mult * 100) / 100 : '';
             return (
               <div key={i} className={`flex items-center gap-3 px-4 py-3 text-sm ${i > 0 ? 'border-t border-dashed border-gray-100' : ''}`}>
-                <span className="font-bold min-w-[60px] text-green-700 text-xs">{amt} {ing.unit || ''}</span>
+                <span className="font-bold min-w-[60px] text-brand text-xs">{amt} {ing.unit || ''}</span>
                 <span className="flex-1">{ing.name}</span>
               </div>
             );
@@ -223,7 +229,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
                   {step.title && <div className="font-bold text-sm mb-1">{step.title}</div>}
                   <div className="text-sm text-gray-600 leading-relaxed">{step.content}</div>
                   {step.timer_seconds && (
-                    <span className="inline-flex items-center gap-1 text-xs text-green-700 font-semibold mt-2 px-2.5 py-1 bg-green-50 rounded-lg">
+                    <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold mt-2 px-2.5 py-1 bg-brand-light rounded-lg">
                       ⏱ {fmtTimer(step.timer_seconds)}
                     </span>
                   )}
@@ -246,7 +252,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
         {replyTo && (
           <div className="flex items-center gap-2 mb-2 px-1 text-xs text-gray-500">
-            <span>Отвечаю @{replyTo}</span>
+            <span>Отвечаю @{replyTo.username}</span>
             <button className="text-gray-400 ml-1" onClick={() => { setReplyTo(null); setNewComment(''); }}>✕</button>
           </div>
         )}
@@ -254,7 +260,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
         <div className="flex gap-2 mb-4">
           <input
             ref={commentRef}
-            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white transition-colors"
+            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
             placeholder={t(lang, 'addComment')}
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
@@ -269,25 +275,34 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
         {comments.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">{t(lang, 'noComments')}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {comments.map(c => (
-              <div key={c.id} className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm">
+        ) : (() => {
+          const topLevel = comments.filter(c => !c.parent_id);
+          const repliesMap = {};
+          comments.filter(c => c.parent_id).forEach(c => {
+            if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
+            repliesMap[c.parent_id].push(c);
+          });
+
+          function CommentRow({ c, isReply }) {
+            return (
+              <div className={`bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm ${isReply ? 'ml-8 border-l-2 border-l-gray-100' : ''}`}>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {c.profiles?.avatar_url ? (
-                    <img src={c.profiles.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                    <img src={c.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
-                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">
                       {(c.profiles?.display_name || c.profiles?.username || '?')[0].toUpperCase()}
                     </div>
                   )}
                   <span className="text-xs font-bold">{c.profiles?.display_name || c.profiles?.username}</span>
                   {c.user_id === r.user_id && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">{t(lang, 'authorBadge')}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-light text-brand">{t(lang, 'authorBadge')}</span>
                   )}
                   <span className="text-xs text-gray-400">{timeAgo(c.created_at, lang)}</span>
                   <div className="ml-auto flex items-center gap-3">
-                    <button className="text-xs text-gray-400 font-semibold" onClick={() => handleReply(c.profiles?.display_name || c.profiles?.username)}>{t(lang, 'replyBtn')}</button>
+                    {!isReply && (
+                      <button className="text-xs text-gray-400 font-semibold" onClick={() => handleReply(c)}>{t(lang, 'replyBtn')}</button>
+                    )}
                     {canDelete(c) && (
                       <button className="text-xs text-red-400 font-semibold" onClick={() => deleteComment(c.id)}>{t(lang, 'deleteComment')}</button>
                     )}
@@ -295,9 +310,22 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">{c.text}</p>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          }
+
+          return (
+            <div className="flex flex-col gap-3">
+              {topLevel.map(c => (
+                <div key={c.id} className="flex flex-col gap-2">
+                  <CommentRow c={c} isReply={false} />
+                  {(repliesMap[c.id] || []).map(r => (
+                    <CommentRow key={r.id} c={r} isReply={true} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

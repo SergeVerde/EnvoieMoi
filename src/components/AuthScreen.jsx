@@ -58,7 +58,7 @@ export default function AuthScreen({ supabase }) {
           </p>
           <button
             onClick={() => { setCheckEmail(false); setIsSignUp(false); }}
-            className="text-xs text-green-600 font-semibold"
+            className="text-xs text-brand font-semibold"
           >
             Уже подтвердил? Войти
           </button>
@@ -70,7 +70,7 @@ export default function AuthScreen({ supabase }) {
   return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
       <div className="text-center w-full">
-        <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg shadow-green-700/20">
+        <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand/20">
           <span className="text-2xl">🌿</span>
         </div>
         <h1 className="font-display text-3xl font-extrabold gradient-text mb-1">Pestogram</h1>
@@ -79,7 +79,7 @@ export default function AuthScreen({ supabase }) {
         <div className="max-w-xs mx-auto space-y-3">
           <button
             onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm font-semibold hover:border-green-400 hover:shadow-sm transition-all"
+            className="w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm font-semibold hover:border-brand/40 hover:shadow-sm transition-all"
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -101,14 +101,14 @@ export default function AuthScreen({ supabase }) {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="Email"
-            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white transition-colors"
+            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
           />
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Пароль (мин. 6 символов)"
-            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white transition-colors"
+            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
 

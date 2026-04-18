@@ -100,7 +100,13 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         const normalizedSteps = (data.steps || []).map(s =>
           typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
         );
-        setPrev({ ...data, steps: normalizedSteps });
+        setPrev({
+          ...data,
+          steps: normalizedSteps,
+          dish_type: Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []),
+          meal_time: Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []),
+          dietary: Array.isArray(data.dietary) ? data.dietary : [],
+        });
         setMode('preview');
       }
     } catch (e) {
@@ -135,7 +141,13 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         const normalizedSteps = (data.steps || []).map(s =>
           typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
         );
-        setPrev({ ...data, steps: normalizedSteps });
+        setPrev({
+          ...data,
+          steps: normalizedSteps,
+          dish_type: Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []),
+          meal_time: Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []),
+          dietary: Array.isArray(data.dietary) ? data.dietary : [],
+        });
         setOcrImgs([]);
         setMode('preview');
       }
@@ -328,17 +340,17 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           </div>
 
           <textarea
-            className="w-full min-h-[120px] p-3.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white resize-y leading-relaxed"
+            className="w-full min-h-[120px] p-3.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white resize-y leading-relaxed"
             value={raw}
             onChange={e => setRaw(e.target.value)}
             placeholder={"Борщ\n\nСвёкла - 2 шт\nКартофель - 3 шт\n\n1. Свёклу отварить..."}
           />
 
-          {err && <div className="mt-3 p-3 bg-red-50 rounded-xl text-xs text-red-700">{err}<button className="block mt-2 text-green-600 font-bold" onClick={() => { setMode('manual'); setErr(''); }}>📝 {t(lang, 'manual')}</button></div>}
+          {err && <div className="mt-3 p-3 bg-red-50 rounded-xl text-xs text-red-700">{err}<button className="block mt-2 text-brand font-bold" onClick={() => { setMode('manual'); setErr(''); }}>📝 {t(lang, 'manual')}</button></div>}
 
           {busy ? (
             <div className="flex flex-col items-center py-8 gap-3">
-              <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+              <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
               <span className="text-sm text-gray-500 font-semibold">{bMsg}</span>
               <button className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 bg-white" onClick={cancelRequest}>{t(lang, 'cancelParse')}</button>
             </div>
@@ -374,7 +386,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           </div>
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'titleLabel')}</label>
-          <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-green-500 bg-white" value={mT} onChange={e => setMT(e.target.value)} />
+          <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mT} onChange={e => setMT(e.target.value)} />
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dishType')}</label>
           <div className="flex gap-1.5 flex-wrap mb-3">
@@ -476,7 +488,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <textarea className="w-full min-h-[80px] p-3 border border-gray-200 rounded-2xl text-sm outline-none bg-white resize-y mb-3" value={mTips} onChange={e => setMTips(e.target.value)} placeholder={t(lang, 'tipsP')} />
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">Теги (через запятую)</label>
-          <input className="w-full mb-5 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-green-500 bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
+          <input className="w-full mb-5 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
 
           <button
             className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm"
@@ -490,13 +502,13 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         {mode === 'preview' && prev && <>
           <div className="text-center mb-4"><div className="text-4xl mb-2">👀</div><p className="text-xs text-gray-500">{t(lang, 'check')}</p></div>
 
-          {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
+          {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
 
           <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
             <h3 className="font-display text-xl font-bold mb-2">{prev.title}</h3>
             {prev.description && <p className="text-xs text-gray-500 mb-3">{prev.description}</p>}
             <div className="flex gap-1.5 flex-wrap mb-2">
-              {(prev.dish_type || []).map(dt => <span key={dt} className="text-[11px] px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 font-semibold border border-green-100">{dt}</span>)}
+              {(prev.dish_type || []).map(dt => <span key={dt} className="text-[11px] px-2.5 py-0.5 rounded-full bg-brand-light text-brand font-semibold border border-brand/20">{dt}</span>)}
               {(prev.meal_time || []).map(mt => <span key={mt} className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-100">{mt}</span>)}
               {(prev.dietary || []).map(d => <span key={d} className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">{d}</span>)}
               {prev.cuisine && <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">{prev.cuisine}</span>}
@@ -509,7 +521,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
               {prev.calories && <span>🔥 {prev.calories} {t(lang, 'kcal')}</span>}
             </div>
             <h4 className="font-bold text-sm mb-2">{t(lang, 'ingredients')}</h4>
-            {(prev.ingredients || []).map((g, i) => <div key={i} className="flex gap-2 py-1.5 border-b border-dashed border-gray-100 text-xs"><span className="font-bold min-w-[50px] text-green-700">{g.amount || ''} {g.unit || ''}</span><span>{g.name}</span></div>)}
+            {(prev.ingredients || []).map((g, i) => <div key={i} className="flex gap-2 py-1.5 border-b border-dashed border-gray-100 text-xs"><span className="font-bold min-w-[50px] text-brand">{g.amount || ''} {g.unit || ''}</span><span>{g.name}</span></div>)}
             <h4 className="font-bold text-sm mt-3 mb-2">{t(lang, 'steps')}</h4>
             {(prev.steps || []).map((s, i) => {
               const stepPhotoData = stepPhotos[s._origIdx !== undefined ? s._origIdx : i];
@@ -527,7 +539,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
           <div className="flex gap-2">
             <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={() => setMode('manual')}>← {t(lang, 'back')}</button>
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-700 text-white shadow-sm" onClick={publish} disabled={busy}>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold gradient-btn text-white shadow-sm" onClick={publish} disabled={busy}>
               {isEdit ? t(lang, 'saveChanges') : t(lang, 'publish') + ' 🚀'}
             </button>
           </div>

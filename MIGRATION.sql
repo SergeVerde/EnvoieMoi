@@ -39,18 +39,22 @@ CREATE TABLE IF NOT EXISTS messages (
 -- 5. RLS for conversations
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "conv_select" ON conversations;
 CREATE POLICY "conv_select" ON conversations FOR SELECT
   USING (auth.uid() = user1_id OR auth.uid() = user2_id);
 
+DROP POLICY IF EXISTS "conv_insert" ON conversations;
 CREATE POLICY "conv_insert" ON conversations FOR INSERT
   WITH CHECK (auth.uid() = user1_id OR auth.uid() = user2_id);
 
+DROP POLICY IF EXISTS "conv_update" ON conversations;
 CREATE POLICY "conv_update" ON conversations FOR UPDATE
   USING (auth.uid() = user1_id OR auth.uid() = user2_id);
 
 -- 6. RLS for messages
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "msg_select" ON messages;
 CREATE POLICY "msg_select" ON messages FOR SELECT
   USING (
     EXISTS (
@@ -60,6 +64,7 @@ CREATE POLICY "msg_select" ON messages FOR SELECT
     )
   );
 
+DROP POLICY IF EXISTS "msg_insert" ON messages;
 CREATE POLICY "msg_insert" ON messages FOR INSERT
   WITH CHECK (
     auth.uid() = sender_id AND
@@ -70,7 +75,18 @@ CREATE POLICY "msg_insert" ON messages FOR INSERT
     )
   );
 
--- 7. Refresh recipes_feed view to include dietary and cuisine
+DROP POLICY IF EXISTS "msg_update" ON messages;
+CREATE POLICY "msg_update" ON messages FOR UPDATE
+  USING (auth.uid() = sender_id OR EXISTS (
+    SELECT 1 FROM conversations
+    WHERE id = conversation_id
+      AND (user1_id = auth.uid() OR user2_id = auth.uid())
+  ));
+
+-- 7. Threaded comments: add parent_id
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id) ON DELETE CASCADE;
+
+-- 8. Refresh recipes_feed view to include dietary and cuisine
 -- (Only run if your view doesn't already include them)
 -- Check current view definition first: SELECT definition FROM pg_views WHERE viewname = 'recipes_feed';
 -- If needed, recreate:

@@ -61,14 +61,14 @@ export default function OnboardingView({ supabase, user, profile, lang, onComple
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>
               )}
               {usernameStatus === 'ok' && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 font-bold">✓</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-brand font-bold">✓</span>
               )}
               {usernameStatus === 'taken' && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-red-500 font-bold">✗</span>
               )}
             </div>
             <p className="text-[11px] mt-1 px-1">
-              {usernameStatus === 'ok' && <span className="text-green-600 font-semibold">{t(lang, 'usernameOk')}</span>}
+              {usernameStatus === 'ok' && <span className="text-brand font-semibold">{t(lang, 'usernameOk')}</span>}
               {usernameStatus === 'taken' && <span className="text-red-500 font-semibold">{t(lang, 'usernameTaken')}</span>}
               {usernameStatus === 'short' && <span className="text-gray-400">{t(lang, 'usernameShort')}</span>}
               {!usernameStatus && <span className="text-gray-400">{t(lang, 'usernameHint')}</span>}

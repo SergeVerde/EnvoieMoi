@@ -8,6 +8,7 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [convId, setConvId] = useState(conversationId);
+  const convIdRef = useRef(conversationId);
   const bottomRef = useRef(null);
 
   useEffect(() => { load(); }, []);
@@ -18,10 +19,9 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
 
   async function load() {
     setLoading(true);
-    let cid = convId;
+    let cid = convIdRef.current;
 
     if (!cid) {
-      // Find or create conversation
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
@@ -38,6 +38,7 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
           .single();
         cid = created?.id;
       }
+      convIdRef.current = cid;
       setConvId(cid);
     }
 
@@ -48,27 +49,64 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
         .eq('conversation_id', cid)
         .order('created_at', { ascending: true });
       setMessages(data || []);
+
+      // Mark received messages as read
+      await supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('conversation_id', cid)
+        .neq('sender_id', user.id)
+        .is('read_at', null);
     }
     setLoading(false);
   }
 
+  useEffect(() => {
+    if (!convId) return;
+
+    const channel = supabase
+      .channel(`chat:${convId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${convId}`,
+      }, async (payload) => {
+        const msg = payload.new;
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        // Mark as read if received (not sent by me)
+        if (msg.sender_id !== user.id) {
+          await supabase
+            .from('messages')
+            .update({ read_at: new Date().toISOString() })
+            .eq('id', msg.id);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [convId]);
+
   async function sendMessage() {
-    if (!text.trim() || !convId) return;
+    const cid = convIdRef.current;
+    if (!text.trim() || !cid) return;
     const msg = text.trim();
     setText('');
-    const { data } = await supabase.from('messages').insert({
-      conversation_id: convId,
+    await supabase.from('messages').insert({
+      conversation_id: cid,
       sender_id: user.id,
       text: msg,
-    }).select().single();
-    if (data) setMessages(prev => [...prev, data]);
-    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', convId);
+    });
+    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', cid);
   }
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center gap-3">
+      <div className="sticky top-0 bg-white z-50 border-b border-gray-100 px-5 py-4 flex items-center gap-3">
         <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm flex-shrink-0" onClick={onBack}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -85,7 +123,7 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-5 py-4 pb-24 space-y-2">
         {loading ? (
-          <div className="flex justify-center py-8"><div className="w-8 h-8 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-8"><div className="w-8 h-8 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /></div>
         ) : messages.length === 0 ? (
           <div className="text-center py-8 text-sm text-gray-400">Начните общение!</div>
         ) : (
@@ -93,9 +131,9 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
             const isMe = msg.sender_id === user.id;
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-green-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'}`}>
+                <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-brand text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'}`}>
                   <p>{msg.text}</p>
-                  <p className={`text-[10px] mt-1 ${isMe ? 'text-green-100' : 'text-gray-400'}`}>{timeAgo(msg.created_at, lang)}</p>
+                  <p className={`text-[10px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'}`}>{timeAgo(msg.created_at, lang)}</p>
                 </div>
               </div>
             );
@@ -107,7 +145,7 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
       {/* Input */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur border-t border-gray-100 flex gap-2">
         <input
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-green-500 bg-white transition-colors"
+          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
           placeholder={t(lang, 'typeMessage')}
           value={text}
           onChange={e => setText(e.target.value)}

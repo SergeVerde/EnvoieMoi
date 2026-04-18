@@ -4,7 +4,48 @@ import { useState, useEffect, useRef } from 'react';
 import { t, timeAgo } from '@/lib/i18n';
 import { resizeImage } from '@/lib/image';
 
-export default function ProfileView({ supabase, userId, currentUser, profile: myProfile, lang, onBack, onOpenRecipe, onSettings, onLogout, setProfile, onMessage }) {
+function SwipeRow({ children, onSwipe, canSwipe }) {
+  const [offsetX, setOffsetX] = useState(0);
+  const startX = useRef(null);
+  const THRESHOLD = 60;
+
+  if (!canSwipe) return <>{children}</>;
+
+  function onTouchStart(e) { startX.current = e.touches[0].clientX; }
+  function onTouchMove(e) {
+    if (startX.current === null) return;
+    const dx = e.touches[0].clientX - startX.current;
+    if (dx < 0) setOffsetX(Math.max(dx, -THRESHOLD));
+  }
+  function onTouchEnd() {
+    if (offsetX < -THRESHOLD / 2) setOffsetX(-THRESHOLD);
+    else setOffsetX(0);
+    startX.current = null;
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl">
+      <div
+        className="transition-transform duration-150"
+        style={{ transform: `translateX(${offsetX}px)` }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {children}
+      </div>
+      <button
+        className="absolute right-0 top-0 h-full px-4 bg-red-500 text-white text-xs font-bold rounded-r-2xl flex items-center"
+        style={{ opacity: offsetX < -10 ? 1 : 0, transition: 'opacity 0.15s' }}
+        onClick={onSwipe}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+      </button>
+    </div>
+  );
+}
+
+export default function ProfileView({ supabase, userId, currentUser, profile: myProfile, lang, onBack, onOpenRecipe, onOpenProfile, onSettings, onLogout, setProfile, onMessage }) {
   const [prof, setProf] = useState(null);
   const [recipes, setRecipes] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
@@ -128,7 +169,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-      <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+      <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
     </div>
   );
 
@@ -150,17 +191,33 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     createProfile();
     return (
       <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
-        <div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" />
+        <div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" />
       </div>
     );
   }
 
   // Followers / Following panel
   if (profileSection) {
-    const title = profileSection === 'followers' ? t(lang, 'followersTitle') : t(lang, 'followingTitle');
+    const isFollowers = profileSection === 'followers';
+    const title = isFollowers ? t(lang, 'followersTitle') : t(lang, 'followingTitle');
+
+    async function removeUser(u) {
+      if (!confirm(isFollowers ? `Удалить ${u.display_name || u.username} из подписчиков?` : `Отписаться от ${u.display_name || u.username}?`)) return;
+      if (isFollowers) {
+        // Remove them from following current profile
+        await supabase.from('follows').delete().eq('follower_id', u.id).eq('following_id', userId);
+        setFollowersCount(c => c - 1);
+      } else {
+        // Unfollow them
+        await supabase.from('follows').delete().eq('follower_id', currentUser.id).eq('following_id', u.id);
+        setFollowingCount(c => c - 1);
+      }
+      setUserList(prev => prev.filter(x => x.id !== u.id));
+    }
+
     return (
       <div className="max-w-md mx-auto min-h-screen pb-6">
-        <div className="sticky top-0 bg-[#f8f7f4] z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
           <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={() => setProfileSection(null)}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
@@ -169,29 +226,34 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
         </div>
         <div className="px-5 pt-4">
           {listLoading ? (
-            <div className="flex justify-center py-12"><div className="w-9 h-9 border-3 border-gray-200 border-t-green-600 rounded-full animate-spin" /></div>
+            <div className="flex justify-center py-12"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /></div>
           ) : userList.length === 0 ? (
             <p className="text-center text-gray-400 text-sm py-12">Пока никого нет</p>
           ) : (
             <div className="flex flex-col gap-2">
               {userList.map(u => (
-                <button
+                <SwipeRow
                   key={u.id}
-                  className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left shadow-sm"
-                  onClick={() => { setProfileSection(null); onBack(); setTimeout(() => onOpenRecipe && window.dispatchEvent(new CustomEvent('openProfile', { detail: u.id })), 50); }}
+                  onSwipe={() => removeUser(u)}
+                  canSwipe={isFollowers ? isMe : (currentUser?.id === userId)}
                 >
-                  {u.avatar_url ? (
-                    <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center text-white font-extrabold font-display">
-                      {(u.display_name || u.username || '?')[0].toUpperCase()}
+                  <button
+                    className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 text-left shadow-sm w-full"
+                    onClick={() => { setProfileSection(null); onOpenProfile ? onOpenProfile(u.id) : null; }}
+                  >
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl gradient-btn flex items-center justify-center text-white font-extrabold font-display">
+                        {(u.display_name || u.username || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm">{u.display_name || u.username}</div>
+                      <div className="text-xs text-gray-400">@{u.username}</div>
                     </div>
-                  )}
-                  <div>
-                    <div className="font-bold text-sm">{u.display_name || u.username}</div>
-                    <div className="text-xs text-gray-400">@{u.username}</div>
-                  </div>
-                </button>
+                  </button>
+                </SwipeRow>
               ))}
             </div>
           )}
@@ -279,13 +341,13 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
             {isMe && (
               <>
                 <input type="file" accept="image/*" ref={avatarRef} className="hidden" onChange={uploadAvatar} />
-                <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm shadow-md" onClick={() => avatarRef.current?.click()}>📷</button>
+                <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center text-sm shadow-md" onClick={() => avatarRef.current?.click()}>📷</button>
               </>
             )}
           </div>
 
           {editing ? (
-            <input className="mt-3 text-center font-display text-xl font-bold outline-none border-b-2 border-green-500 bg-transparent w-48" value={editName} onChange={e => setEditName(e.target.value)} />
+            <input className="mt-3 text-center font-display text-xl font-bold outline-none border-b-2 border-brand bg-transparent w-48" value={editName} onChange={e => setEditName(e.target.value)} />
           ) : (
             <h2 className="font-display text-xl font-bold mt-3">{prof.display_name || prof.username}</h2>
           )}
@@ -316,13 +378,13 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
               <input className="w-full px-2.5 py-2 border border-gray-200 rounded-xl text-sm outline-none bg-white" value={editWeb} onChange={e => setEditWeb(e.target.value)} placeholder={t(lang, 'websiteP')} />
               <div className="flex gap-2">
                 <button className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200" onClick={() => setEditing(false)}>{t(lang, 'back')}</button>
-                <button className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-green-700 text-white" onClick={saveEdit}>{t(lang, 'save')}</button>
+                <button className="flex-1 py-2.5 rounded-xl text-sm font-bold gradient-btn text-white" onClick={saveEdit}>{t(lang, 'save')}</button>
               </div>
             </div>
           ) : (
             <>
               {prof.bio && <p className="text-sm text-gray-600 mt-3 leading-relaxed">{prof.bio}</p>}
-              {prof.website && <a href={prof.website.startsWith('http') ? prof.website : 'https://' + prof.website} target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-xs text-green-600 font-semibold">🔗 {prof.website}</a>}
+              {prof.website && <a href={prof.website.startsWith('http') ? prof.website : 'https://' + prof.website} target="_blank" rel="noopener noreferrer" className="inline-block mt-1 text-xs text-brand font-semibold">🔗 {prof.website}</a>}
             </>
           )}
 
@@ -344,11 +406,10 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
                 </button>
                 {onMessage && (
                   <button
-                    className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-600 shadow-sm flex items-center gap-1.5"
+                    className="w-10 h-10 rounded-xl bg-white border border-gray-200 text-gray-600 shadow-sm flex items-center justify-center"
                     onClick={() => onMessage(userId, prof.display_name || prof.username)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    {t(lang, 'writeMsg')}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   </button>
                 )}
               </>

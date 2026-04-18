@@ -4,16 +4,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: { DEFAULT: '#16a34a', dark: '#15803d', light: '#f0fdf4' },
-        danger: '#e74c3c',
+        brand: { DEFAULT: '#E94E1B', hover: '#D84315', light: '#FFF1EE' },
+        surface: '#F8F5F1',
+        danger: '#DC2626',
+        basil: '#6FCF97',
+        saffron: '#F2C94C',
       },
       fontFamily: {
         display: ['Playfair Display', 'serif'],
-        body: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
       },
-      borderWidth: {
-        '3': '3px',
-      },
+      borderWidth: { '3': '3px' },
     },
   },
   plugins: [],
