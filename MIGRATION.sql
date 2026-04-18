@@ -98,7 +98,8 @@ CREATE POLICY "Users can soft delete comments" ON comments FOR UPDATE
 
 -- 8. Recreate recipes_feed view to include all new columns
 -- (SELECT * in views is static — must recreate after adding columns)
-CREATE OR REPLACE VIEW recipes_feed AS
+DROP VIEW IF EXISTS recipes_feed;
+CREATE VIEW recipes_feed AS
 SELECT
   r.id, r.user_id, r.title, r.description, r.servings, r.prep_time, r.cook_time,
   r.calories, r.calories_per, r.ingredients, r.steps, r.tags, r.tips, r.lang,
