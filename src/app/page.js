@@ -29,7 +29,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState(null);
   const [viewUserId, setViewUserId] = useState(null);
   const [toast, setToast] = useState('');
-  const [settings, setSettings] = useState({ ui_lang: 'ru', recipe_lang: 'ru', message_privacy: 'everyone' });
+  const [settings, setSettings] = useState({ ui_lang: 'ru', recipe_lang: 'ru', message_privacy: 'everyone', feed_mode: 'chronological' });
   const [editRecipeData, setEditRecipeData] = useState(null);
   const [exportRecipeData, setExportRecipeData] = useState(null);
   const [exportPhotos, setExportPhotos] = useState([]);
@@ -46,6 +46,26 @@ export default function Home() {
   const [chatOtherAvatar, setChatOtherAvatar] = useState('');
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
+
+  function buildPrefMap(likedRecipes) {
+    const map = { tags: {}, cuisines: {}, dishTypes: {} };
+    likedRecipes.forEach(r => {
+      (r.tags || []).forEach(tg => { map.tags[tg] = (map.tags[tg] || 0) + 1; });
+      if (r.cuisine) map.cuisines[r.cuisine] = (map.cuisines[r.cuisine] || 0) + 1;
+      const dt = Array.isArray(r.dish_type) ? r.dish_type : (r.dish_type ? [r.dish_type] : []);
+      dt.forEach(d => { map.dishTypes[d] = (map.dishTypes[d] || 0) + 1; });
+    });
+    return map;
+  }
+
+  function scoreRecipe(r, prefMap) {
+    let score = 0;
+    (r.tags || []).forEach(tg => { score += prefMap.tags[tg] || 0; });
+    if (r.cuisine) score += (prefMap.cuisines[r.cuisine] || 0) * 2;
+    const dt = Array.isArray(r.dish_type) ? r.dish_type : (r.dish_type ? [r.dish_type] : []);
+    dt.forEach(d => { score += prefMap.dishTypes[d] || 0; });
+    return score;
+  }
 
   const L = settings.ui_lang;
   const canAdd = ['cook', 'admin', 'creator', 'premium'].includes(profile?.role);
@@ -229,10 +249,19 @@ export default function Home() {
       return r.title.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q);
     }
     return true;
-  }).sort((a, b) => sortOrder === 'asc'
-    ? new Date(a.created_at) - new Date(b.created_at)
-    : new Date(b.created_at) - new Date(a.created_at)
-  );
+  }).sort((a, b) => {
+    if (settings.feed_mode === 'smart' && !search && screen !== 'favorites') {
+      const likedRecipes = recipes.filter(r => likeIds.includes(r.id));
+      if (likedRecipes.length > 0) {
+        const prefMap = buildPrefMap(likedRecipes);
+        const diff = scoreRecipe(b, prefMap) - scoreRecipe(a, prefMap);
+        if (diff !== 0) return diff;
+      }
+    }
+    return sortOrder === 'asc'
+      ? new Date(a.created_at) - new Date(b.created_at)
+      : new Date(b.created_at) - new Date(a.created_at);
+  });
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">

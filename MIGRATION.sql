@@ -6,9 +6,11 @@ ALTER TABLE recipes
   ADD COLUMN IF NOT EXISTS dietary text[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS cuisine text DEFAULT '';
 
--- 2. Add message privacy to user_settings
+-- 2. Add message privacy and feed mode to user_settings
 ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS message_privacy text DEFAULT 'everyone';
+ALTER TABLE user_settings
+  ADD COLUMN IF NOT EXISTS feed_mode text DEFAULT 'chronological';
 
 -- 3. Conversations table
 CREATE TABLE IF NOT EXISTS conversations (

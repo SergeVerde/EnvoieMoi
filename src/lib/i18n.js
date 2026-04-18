@@ -72,6 +72,9 @@ const translations = {
     writeMsg: 'Написать', cantMsg: 'Этот пользователь ограничил сообщения',
     addPhStep: 'Фото к шагу', photoStep: 'Фото шага',
     skip: 'Пропустить',
+    feedMode: 'Режим ленты',
+    feedChronological: 'Сначала новые',
+    feedSmart: 'По предпочтениям',
   },
   en: {
     feed: 'Feed', favs: 'Favorites', profile: 'Profile', recipe: 'Recipe',
@@ -146,6 +149,9 @@ const translations = {
     writeMsg: 'Message', cantMsg: 'This user has restricted messages',
     addPhStep: 'Step photo', photoStep: 'Step photo',
     skip: 'Skip',
+    feedMode: 'Feed mode',
+    feedChronological: 'Newest first',
+    feedSmart: 'By preferences',
   },
 };
 
