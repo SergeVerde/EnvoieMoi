@@ -135,7 +135,7 @@ export default function AuthScreen({ supabase }) {
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
       <div className="text-center w-full">
         <img src="/logo2.svg" alt="" className="w-16 h-16 mx-auto mb-5" />
-        <img src="/logo.svg" alt="Pestogram" className="h-8 mx-auto mb-1" />
+        <img src="/logo3.svg" alt="Pestogram" className="h-8 mx-auto mb-1" />
         <p className="text-gray-400 text-sm mb-8">Социальная сеть рецептов</p>
 
         <div className="max-w-xs mx-auto space-y-3">
