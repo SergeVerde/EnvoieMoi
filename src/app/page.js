@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { t, DISH_TYPES, MEAL_TIMES, DIETARY_TAGS, CUISINES } from '@/lib/i18n';
 import RecipeCard from '@/components/RecipeCard';
@@ -46,6 +46,8 @@ export default function Home() {
   const [chatOtherAvatar, setChatOtherAvatar] = useState('');
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollY = useRef(0);
 
   function buildPrefMap(likedRecipes) {
     const map = { tags: {}, cuisines: {}, dishTypes: {} };
@@ -89,6 +91,17 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    function onScroll() {
+      const y = window.scrollY;
+      if (y > lastScrollY.current && y > 80) setHeaderHidden(true);
+      else if (y < lastScrollY.current) setHeaderHidden(false);
+      lastScrollY.current = y;
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => {
@@ -411,45 +424,47 @@ export default function Home() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="sticky top-0 bg-[#f8f7f4]/95 backdrop-blur z-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg gradient-btn flex items-center justify-center shadow-sm">
-            <span className="text-sm">🌿</span>
+      {/* Sticky header: logo + search + filters */}
+      <div className={`sticky top-0 z-50 bg-[#f8f7f4]/95 backdrop-blur border-b border-gray-100 transition-transform duration-300 ${headerHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+        <div className="px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg gradient-btn flex items-center justify-center shadow-sm">
+              <span className="text-sm">🌿</span>
+            </div>
+            <h1 className="font-display text-xl font-extrabold gradient-text">Pestogram</h1>
           </div>
-          <h1 className="font-display text-xl font-extrabold gradient-text">Pestogram</h1>
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="px-5 pt-3 pb-2">
-        <div className="flex gap-2">
-          <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-2xl shadow-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <input
-              className="flex-1 outline-none text-sm bg-transparent"
-              placeholder={isProfileSearch ? t(L, 'searchProfiles') : t(L, 'search')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            {search && <button className="text-gray-300 text-lg leading-none" onClick={() => setSearch('')}>✕</button>}
+        <div className="px-5 pb-3">
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <input
+                className="flex-1 outline-none bg-transparent"
+                style={{ fontSize: '16px' }}
+                placeholder={isProfileSearch ? t(L, 'searchProfiles') : t(L, 'search')}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && <button className="text-gray-300 text-lg leading-none" onClick={() => setSearch('')}>✕</button>}
+            </div>
+            {settings.feed_mode !== 'smart' && (
+              <button
+                className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-gray-500"
+                onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+              >
+                {sortOrder === 'desc'
+                  ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                }
+              </button>
+            )}
+            <button
+              className={`w-10 h-10 rounded-2xl border flex items-center justify-center flex-shrink-0 shadow-sm ${hasFilters || filterOpen ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500'}`}
+              onClick={() => setFilterOpen(o => !o)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+            </button>
           </div>
-          <button
-            className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-gray-500"
-            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-            title={sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}
-          >
-            {sortOrder === 'desc'
-              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-            }
-          </button>
-          <button
-            className={`w-10 h-10 rounded-2xl border flex items-center justify-center flex-shrink-0 shadow-sm ${hasFilters || filterOpen ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500'}`}
-            onClick={() => setFilterOpen(o => !o)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
-          </button>
         </div>
       </div>
 
@@ -509,23 +524,6 @@ export default function Home() {
               <button className="mt-1 text-xs text-red-400 font-semibold" onClick={() => { setFilterDishType(null); setFilterMealTime(null); setFilterDietary([]); setFilterCuisine(null); }}>{t(L, 'clearFilters')}</button>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Tags */}
-      {!isProfileSearch && allTags.length > 0 && (
-        <div className="flex gap-2 px-5 pb-3 overflow-x-auto hide-scrollbar">
-          <button
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${!filter ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`}
-            onClick={() => setFilter(null)}
-          >{t(L, 'all')}</button>
-          {allTags.map(tag => (
-            <button
-              key={tag}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold border whitespace-nowrap transition-colors ${filter === tag ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`}
-              onClick={() => setFilter(tag)}
-            >{tag}</button>
-          ))}
         </div>
       )}
 

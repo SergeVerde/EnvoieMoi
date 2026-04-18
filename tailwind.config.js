@@ -11,7 +11,7 @@ module.exports = {
         saffron: '#F2C94C',
       },
       fontFamily: {
-        display: ['Playfair Display', 'serif'],
+        display: ['Plus Jakarta Sans', 'sans-serif'],
         sans: ['Inter', 'sans-serif'],
       },
       borderWidth: { '3': '3px' },

@@ -317,7 +317,11 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         user_id: user.id, ...recipeData, lang: recipeLang,
       }).select().single();
 
-      if (error || !recipe) { setBusy(false); setBMsg(''); return; }
+      if (error || !recipe) {
+        setBusy(false); setBMsg('');
+        setErr('Ошибка публикации: ' + (error?.message || 'попробуй снова'));
+        return;
+      }
 
       if (mainPhotoFile) {
         const path = `${user.id}/${recipe.id}/main_${Date.now()}.jpg`;
@@ -433,7 +437,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             )}
           </div>
 
-          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'titleLabel')}</label>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'titleLabel')} <span className="text-brand">*</span></label>
           <input className="w-full mb-3 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mT} onChange={e => setMT(e.target.value)} />
 
           <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'dishType')}</label>
@@ -476,7 +480,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             </div>
           </div>
 
-          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'ingredients')}</label>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'ingredients')} <span className="text-brand">*</span></label>
           {mI.map((x, i) => (
             <div key={i} className="flex gap-1.5 items-center mb-2">
               <input className="flex-1 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" value={x.name} onChange={e => setMI(mI.map((v,j) => j===i ? {...v, name: e.target.value} : v))} placeholder={t(lang, 'ingName')} />
@@ -489,7 +493,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           ))}
           <button className="w-full py-2 border border-dashed border-gray-200 rounded-xl text-xs font-semibold text-gray-500 mb-4" onClick={() => setMI([...mI, { name: '', amount: '', unit: 'шт' }])}>{t(lang, 'addIng')}</button>
 
-          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'steps')}</label>
+          <label className="text-xs font-bold text-gray-500 mb-1 block">{t(lang, 'steps')} <span className="text-brand">*</span></label>
           {mS.map((x, i) => {
             const stepContent = typeof x === 'string' ? x : (x.content || '');
             const stepPhotoData = stepPhotos[i];
@@ -551,7 +555,8 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
             }}
           >{t(lang, 'prevBtn')}</button>
           {err && <div className="mt-2 text-xs text-red-500 font-semibold px-1">{err}</div>}
-          {!isEdit && <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>}
+          <p className="text-[10px] text-gray-300 text-center mt-2">* — обязательные поля</p>
+          {!isEdit && <button className="block mx-auto mt-2 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>}
         </>}
 
         {/* Preview mode */}

@@ -6,9 +6,11 @@ export default function AuthScreen({ supabase }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -43,6 +45,17 @@ export default function AuthScreen({ supabase }) {
     });
   };
 
+  const handleForgot = async () => {
+    if (!email.trim()) { setError('Введи email'); return; }
+    setLoading(true); setError('');
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin + '/auth/callback',
+    });
+    setLoading(false);
+    if (err) setError(err.message);
+    else setResetSent(true);
+  };
+
   if (checkEmail) {
     return (
       <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
@@ -56,12 +69,57 @@ export default function AuthScreen({ supabase }) {
           <p className="text-gray-400 text-xs mb-6">
             Нажми на ссылку в письме — ты автоматически войдёшь в приложение
           </p>
-          <button
-            onClick={() => { setCheckEmail(false); setIsSignUp(false); }}
-            className="text-xs text-brand font-semibold"
-          >
+          <button onClick={() => { setCheckEmail(false); setIsSignUp(false); }} className="text-xs text-brand font-semibold">
             Уже подтвердил? Войти
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (resetSent) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
+        <div className="text-center w-full">
+          <div className="text-6xl mb-6">🔑</div>
+          <h1 className="font-display text-2xl font-extrabold mb-2">Письмо отправлено!</h1>
+          <p className="text-gray-500 mb-6 text-sm">
+            Ссылка для сброса пароля отправлена на<br/><strong>{email}</strong>
+          </p>
+          <button onClick={() => { setResetSent(false); setForgotMode(false); }} className="text-xs text-brand font-semibold">
+            Вернуться к входу
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (forgotMode) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
+        <div className="text-center w-full">
+          <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand/20">
+            <span className="text-2xl">🌿</span>
+          </div>
+          <h1 className="font-display text-2xl font-extrabold gradient-text mb-1">Сброс пароля</h1>
+          <p className="text-gray-400 text-sm mb-8">Введи свой email — пришлём ссылку для сброса</p>
+
+          <div className="max-w-xs mx-auto space-y-3">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Email *"
+              className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
+            />
+            {error && <div className="text-xs text-red-500 bg-red-50 rounded-xl p-3">{error}</div>}
+            <button onClick={handleForgot} disabled={loading} className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm">
+              {loading ? '...' : 'Отправить ссылку'}
+            </button>
+            <button onClick={() => { setForgotMode(false); setError(''); }} className="text-xs text-gray-400">
+              Вернуться к входу
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -100,36 +158,35 @@ export default function AuthScreen({ supabase }) {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
+            placeholder="Email *"
             className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
           />
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Пароль (мин. 6 символов)"
+            placeholder="Пароль (мин. 6 символов) *"
             className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
 
-          {error && (
-            <div className="text-xs text-red-500 bg-red-50 rounded-xl p-3">{error}</div>
-          )}
+          {error && <div className="text-xs text-red-500 bg-red-50 rounded-xl p-3">{error}</div>}
 
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm"
-          >
+          <button onClick={handleSubmit} disabled={loading} className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm">
             {loading ? '...' : isSignUp ? 'Зарегистрироваться' : 'Войти'}
           </button>
 
-          <button
-            onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {isSignUp ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
-          </button>
+          <div className="flex items-center justify-between">
+            <button onClick={() => { setIsSignUp(!isSignUp); setError(''); }} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              {isSignUp ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
+            </button>
+            {!isSignUp && (
+              <button onClick={() => { setForgotMode(true); setError(''); }} className="text-xs text-brand font-semibold">
+                Забыл пароль?
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-300 text-center">* — обязательные поля</p>
         </div>
       </div>
     </div>

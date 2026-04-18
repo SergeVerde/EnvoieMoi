@@ -169,16 +169,6 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
           </div>
         )}
 
-        {/* AI tags — small, italic */}
-        {(r.tags || []).length > 0 && (
-          <div className="flex gap-1 flex-wrap mb-4">
-            {(r.tags || []).map(tg => (
-              <button key={tg} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-300 italic border border-gray-100" onClick={() => onTagClick?.('tag', tg)}>
-                {tg}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Meta */}
         <div className="flex gap-3 mb-5 flex-wrap items-center">
@@ -278,6 +268,17 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
             <h3 className="font-display text-lg font-bold mb-3">{t(lang, 'tips')}</h3>
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-800 leading-relaxed mb-6">{r.tips}</div>
           </>
+        )}
+
+        {/* AI tags — small, italic, after tips */}
+        {(r.tags || []).length > 0 && (
+          <div className="flex gap-1 flex-wrap mb-4">
+            {(r.tags || []).map(tg => (
+              <button key={tg} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-300 italic border border-gray-100" onClick={() => onTagClick?.('tag', tg)}>
+                {tg}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Date */}

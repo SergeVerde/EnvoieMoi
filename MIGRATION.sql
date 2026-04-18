@@ -1,10 +1,20 @@
 -- Run these in Supabase SQL Editor (https://app.supabase.com/project/_/sql)
 -- Required for new Pestogram features
 
--- 1. Add dietary and cuisine to recipes
+-- 1. Add dietary, cuisine, dish_type, meal_time to recipes
 ALTER TABLE recipes
   ADD COLUMN IF NOT EXISTS dietary text[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS cuisine text DEFAULT '';
+
+-- Add dish_type and meal_time as text[] (safe: only adds if missing)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='recipes' AND column_name='dish_type') THEN
+    ALTER TABLE recipes ADD COLUMN dish_type text[] DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='recipes' AND column_name='meal_time') THEN
+    ALTER TABLE recipes ADD COLUMN meal_time text[] DEFAULT '{}';
+  END IF;
+END $$;
 
 -- 2. Add message privacy and feed mode to user_settings
 ALTER TABLE user_settings
