@@ -377,6 +377,7 @@ export default function Home() {
       supabase={supabase}
       user={user}
       settings={settings}
+      profile={profile}
       lang={L}
       onBack={() => setScreen('profile')}
       onUpdate={(s) => setSettings(s)}
@@ -447,17 +448,15 @@ export default function Home() {
               />
               {search && <button className="text-gray-300 text-lg leading-none" onClick={() => setSearch('')}>✕</button>}
             </div>
-            {settings.feed_mode !== 'smart' && (
-              <button
-                className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-gray-500"
-                onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-              >
-                {sortOrder === 'desc'
-                  ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-                  : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-                }
-              </button>
-            )}
+            <button
+              className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-gray-500"
+              onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+            >
+              {sortOrder === 'desc'
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+              }
+            </button>
             <button
               className={`w-10 h-10 rounded-2xl border flex items-center justify-center flex-shrink-0 shadow-sm ${hasFilters || filterOpen ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500'}`}
               onClick={() => setFilterOpen(o => !o)}
@@ -468,61 +467,67 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Filter panel */}
+      {/* Filter panel — fixed bottom sheet */}
       {filterOpen && (
-        <div className="px-5 pb-3">
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <div className="mb-3">
+        <div className="fixed inset-0 z-[90] flex items-end justify-center" onClick={() => setFilterOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-t-3xl w-full max-w-md p-5 pb-8 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-5" />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg font-bold">{t(L, 'filters')}</h3>
+              {hasFilters && (
+                <button className="text-xs text-red-400 font-semibold" onClick={() => { setFilterDishType(null); setFilterMealTime(null); setFilterDietary([]); setFilterCuisine(null); }}>{t(L, 'clearFilters')}</button>
+              )}
+            </div>
+            <div className="mb-4">
               <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">{t(L, 'dishType')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {DISH_TYPES.map(dt => (
                   <button
                     key={dt}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${filterDishType === dt ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${filterDishType === dt ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                     onClick={() => setFilterDishType(filterDishType === dt ? null : dt)}
                   >{dt}</button>
                 ))}
               </div>
             </div>
-            <div className="mb-3">
+            <div className="mb-4">
               <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">{t(L, 'mealTime')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {MEAL_TIMES.map(mt => (
                   <button
                     key={mt}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${filterMealTime === mt ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${filterMealTime === mt ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                     onClick={() => setFilterMealTime(filterMealTime === mt ? null : mt)}
                   >{mt}</button>
                 ))}
               </div>
             </div>
-            <div className="mb-3">
+            <div className="mb-4">
               <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">{t(L, 'dietary')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {DIETARY_TAGS.map(d => (
                   <button
                     key={d}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${filterDietary.includes(d) ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${filterDietary.includes(d) ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                     onClick={() => setFilterDietary(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
                   >{d}</button>
                 ))}
               </div>
             </div>
-            <div className="mb-3">
+            <div className="mb-4">
               <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">{t(L, 'cuisine')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {CUISINES.map(c => (
                   <button
                     key={c}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${filterCuisine === c ? 'bg-blue-700 text-white border-blue-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${filterCuisine === c ? 'bg-blue-700 text-white border-blue-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                     onClick={() => setFilterCuisine(filterCuisine === c ? null : c)}
                   >{c}</button>
                 ))}
               </div>
             </div>
-            {hasFilters && (
-              <button className="mt-1 text-xs text-red-400 font-semibold" onClick={() => { setFilterDishType(null); setFilterMealTime(null); setFilterDietary([]); setFilterCuisine(null); }}>{t(L, 'clearFilters')}</button>
-            )}
+            <button className="w-full py-3 gradient-btn text-white rounded-2xl text-sm font-bold mt-2" onClick={() => setFilterOpen(false)}>Применить</button>
           </div>
         </div>
       )}

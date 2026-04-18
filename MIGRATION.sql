@@ -108,8 +108,41 @@ CREATE POLICY "Users can soft delete comments" ON comments FOR UPDATE
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'creator'))
   );
 
--- 8. Recreate recipes_feed view to include all new columns
--- (SELECT * in views is static — must recreate after adding columns)
+-- 8. Fix calories_per check constraint to allow per100g and null
+ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_calories_per_check;
+ALTER TABLE recipes ADD CONSTRAINT recipes_calories_per_check
+  CHECK (calories_per IN ('serving', 'total', 'per100g') OR calories_per IS NULL);
+
+-- 9. Add birthdate to profiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birthdate date;
+
+-- Set default birthdate for existing users who don't have one
+UPDATE profiles SET birthdate = '1977-01-29' WHERE birthdate IS NULL;
+
+-- 10. Blocks table
+CREATE TABLE IF NOT EXISTS blocks (
+  blocker_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  blocked_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+
+ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "blocks_select" ON blocks;
+CREATE POLICY "blocks_select" ON blocks FOR SELECT
+  USING (auth.uid() = blocker_id OR auth.uid() = blocked_id);
+
+DROP POLICY IF EXISTS "blocks_insert" ON blocks;
+CREATE POLICY "blocks_insert" ON blocks FOR INSERT
+  WITH CHECK (auth.uid() = blocker_id);
+
+DROP POLICY IF EXISTS "blocks_delete" ON blocks;
+CREATE POLICY "blocks_delete" ON blocks FOR DELETE
+  USING (auth.uid() = blocker_id);
+
+-- 11. Recreate recipes_feed view to include all new columns
+-- (SELECT * in views is static -- must recreate after adding columns)
 DROP VIEW IF EXISTS recipes_feed;
 CREATE VIEW recipes_feed AS
 SELECT

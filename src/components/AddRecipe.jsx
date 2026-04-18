@@ -272,7 +272,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       prep_time: prev.prep_time || '',
       cook_time: prev.cook_time || '',
       calories: prev.calories,
-      calories_per: prev.calories_per || 'serving',
+      calories_per: ['serving', 'total', 'per100g'].includes(prev.calories_per) ? prev.calories_per : 'serving',
       ingredients: prev.ingredients,
       tags: prev.tags || [],
       tips: prev.tips || '',
@@ -477,6 +477,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
               <input className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm outline-none bg-white" type="number" value={mCal} onChange={e => setMCal(e.target.value)} placeholder={t(lang, 'kcal')} />
               <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='serving'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('serving')}>{t(lang, 'calP')}</button>
               <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='total'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('total')}>{t(lang, 'calT')}</button>
+              <button className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${mCalP==='per100g'?'bg-gray-900 text-white border-gray-900':'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMCalP('per100g')}>{t(lang, 'cal100')}</button>
             </div>
           </div>
 

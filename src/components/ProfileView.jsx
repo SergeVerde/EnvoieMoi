@@ -62,6 +62,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   const [avatarLightbox, setAvatarLightbox] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const avatarRef = useRef(null);
 
   const isMe = userId === currentUser?.id;
@@ -84,8 +85,12 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     setFollowingCount(followingRes.count || 0);
 
     if (!isMe && currentUser) {
-      const { data } = await supabase.from('follows').select('follower_id').eq('follower_id', currentUser.id).eq('following_id', userId).maybeSingle();
-      setIsFollowing(!!data);
+      const [followRes, blockRes] = await Promise.all([
+        supabase.from('follows').select('follower_id').eq('follower_id', currentUser.id).eq('following_id', userId).maybeSingle(),
+        supabase.from('blocks').select('blocker_id').eq('blocker_id', currentUser.id).eq('blocked_id', userId).maybeSingle(),
+      ]);
+      setIsFollowing(!!followRes.data);
+      setIsBlocked(!!blockRes.data);
     }
     setLoading(false);
   }
@@ -158,6 +163,17 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
     setProf({ ...prof, role: newRole });
     setRoleModal(false);
+  }
+
+  async function toggleBlock() {
+    setMenuOpen(false);
+    if (isBlocked) {
+      await supabase.from('blocks').delete().eq('blocker_id', currentUser.id).eq('blocked_id', userId);
+      setIsBlocked(false);
+    } else {
+      await supabase.from('blocks').insert({ blocker_id: currentUser.id, blocked_id: userId });
+      setIsBlocked(true);
+    }
   }
 
   function doShareProfile() {
@@ -306,20 +322,22 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
           <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-sm" onClick={onSettings}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-        ) : canManage ? (
+        ) : (
           <div className="relative z-50">
             <button className="w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-xl font-bold text-gray-500 leading-none shadow-sm" onClick={() => setMenuOpen(o => !o)}>⋮</button>
             {menuOpen && (
               <div className="absolute right-0 top-12 bg-white rounded-2xl border border-gray-100 shadow-xl min-w-[175px] py-2 z-50">
                 <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={doShareProfile}>{t(lang, 'shareProfile')}</button>
-                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={() => { setMenuOpen(false); setRoleModal(true); }}>{t(lang, 'changeRole')}</button>
+                {canManage && <button className="w-full px-4 py-2.5 text-left text-sm font-semibold hover:bg-gray-50" onClick={() => { setMenuOpen(false); setRoleModal(true); }}>{t(lang, 'changeRole')}</button>}
                 <div className="h-px bg-gray-100 mx-3 my-1" />
-                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-orange-500 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>{t(lang, 'blockUser')}</button>
-                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-500 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>{t(lang, 'reportUser')}</button>
+                <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-orange-500 hover:bg-gray-50" onClick={toggleBlock}>
+                  {isBlocked ? 'Разблокировать' : t(lang, 'blockUser')}
+                </button>
+                {canManage && <button className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-500 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>{t(lang, 'reportUser')}</button>}
               </div>
             )}
           </div>
-        ) : <div className="w-10" />}
+        )}
       </div>
 
       <div className="px-5 pt-6">

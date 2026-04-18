@@ -349,7 +349,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
                 </div>
                 {c.is_deleted ? (
                   <p className="text-sm italic text-gray-400">
-                    {c.deleted_by_role ? 'Удалено модератором' : 'Комментарий удалён'}
+                    Комментарий удалён
                   </p>
                 ) : (
                   <p className="text-sm text-gray-600 leading-relaxed">{c.text}</p>

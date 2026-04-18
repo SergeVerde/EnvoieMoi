@@ -8,6 +8,7 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [convId, setConvId] = useState(conversationId);
+  const [isBlocked, setIsBlocked] = useState(false);
   const convIdRef = useRef(conversationId);
   const bottomRef = useRef(null);
 
@@ -41,6 +42,14 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
       convIdRef.current = cid;
       setConvId(cid);
     }
+
+    const { data: blockData } = await supabase
+      .from('blocks')
+      .select('blocker_id')
+      .eq('blocker_id', user.id)
+      .eq('blocked_id', otherUserId)
+      .maybeSingle();
+    setIsBlocked(!!blockData);
 
     if (cid) {
       const { data } = await supabase
@@ -143,22 +152,37 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur border-t border-gray-100 flex gap-2">
-        <input
-          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
-          placeholder={t(lang, 'typeMessage')}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-        />
-        <button
-          className="w-11 h-11 rounded-2xl gradient-btn flex items-center justify-center text-white flex-shrink-0 shadow-sm disabled:opacity-50"
-          disabled={!text.trim()}
-          onClick={sendMessage}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+      {/* Input or blocked banner */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur border-t border-gray-100">
+        {isBlocked ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500 flex-1">Вы заблокировали этого пользователя</p>
+            <button
+              className="text-xs text-brand font-bold flex-shrink-0"
+              onClick={async () => {
+                await supabase.from('blocks').delete().eq('blocker_id', user.id).eq('blocked_id', otherUserId);
+                setIsBlocked(false);
+              }}
+            >Разблокировать</button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
+              placeholder={t(lang, 'typeMessage')}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            />
+            <button
+              className="w-11 h-11 rounded-2xl gradient-btn flex items-center justify-center text-white flex-shrink-0 shadow-sm disabled:opacity-50"
+              disabled={!text.trim()}
+              onClick={sendMessage}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

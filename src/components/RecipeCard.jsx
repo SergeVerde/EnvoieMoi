@@ -70,14 +70,6 @@ export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike,
           <span>{timeAgo(r.created_at, lang)}</span>
         </div>
 
-        {/* AI tags — small, italic, at bottom */}
-        {(r.tags || []).length > 0 && (
-          <div className="flex gap-1 flex-wrap mt-2">
-            {r.tags.slice(0, 4).map(tag => (
-              <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-300 italic cursor-pointer" onClick={e => tagClick('tag', tag, e)}>{tag}</span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Actions */}

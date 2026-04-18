@@ -5,6 +5,7 @@ import { useState } from 'react';
 export default function AuthScreen({ supabase }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [birthdate, setBirthdate] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +19,8 @@ export default function AuthScreen({ supabase }) {
     setError('');
 
     if (isSignUp) {
-      const { error: err } = await supabase.auth.signUp({
+      if (!birthdate) { setError('Укажи дату рождения'); setLoading(false); return; }
+      const { error: err, data: signUpData } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
         options: {
@@ -27,7 +29,13 @@ export default function AuthScreen({ supabase }) {
         },
       });
       if (err) setError(err.message);
-      else setCheckEmail(true);
+      else {
+        // Save birthdate to profile (may not exist yet, will be set by trigger or fallback)
+        if (signUpData?.user?.id) {
+          await supabase.from('profiles').upsert({ id: signUpData.user.id, birthdate }, { onConflict: 'id' });
+        }
+        setCheckEmail(true);
+      }
     } else {
       const { error: err } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -169,6 +177,18 @@ export default function AuthScreen({ supabase }) {
             className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
+          {isSignUp && (
+            <div>
+              <label className="text-xs text-gray-400 font-semibold mb-1 block">Дата рождения *</label>
+              <input
+                type="date"
+                value={birthdate}
+                onChange={e => setBirthdate(e.target.value)}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:border-brand bg-white transition-colors"
+              />
+            </div>
+          )}
 
           {error && <div className="text-xs text-red-500 bg-red-50 rounded-xl p-3">{error}</div>}
 
