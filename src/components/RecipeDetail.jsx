@@ -9,7 +9,13 @@ function fmtTimer(s) {
   return s + ' сек';
 }
 
-export default function RecipeDetail({ recipeId, supabase, user, userProfile, lang, liked, faved, onLike, onFav, onBack, onOpenProfile, onEdit, onExport, onMessage, showToast }) {
+function toArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; }
+}
+
+export default function RecipeDetail({ recipeId, supabase, user, userProfile, lang, liked, faved, onLike, onFav, onBack, onOpenProfile, onEdit, onExport, onMessage, onTagClick, showToast }) {
   const [recipe, setRecipe] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [mainPhoto, setMainPhoto] = useState(null);
@@ -18,7 +24,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
   const [mult, setMult] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState(null);
-  const [replyTo, setReplyTo] = useState(null); // { id, username }
+  const [replyTo, setReplyTo] = useState(null);
   const commentRef = useRef(null);
 
   useEffect(() => { load(); }, [recipeId]);
@@ -71,7 +77,9 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
   function handleReply(comment) {
     const username = comment.profiles?.display_name || comment.profiles?.username;
-    setReplyTo({ id: comment.id, username });
+    // Always attach reply to the root-level comment so all replies stay in one thread
+    const parentId = comment.parent_id || comment.id;
+    setReplyTo({ id: parentId, username });
     setNewComment(`@${username} `);
     setTimeout(() => commentRef.current?.focus(), 50);
   }
@@ -96,6 +104,17 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
   const mainPhotoObj = photos.find(p => p.is_main) || photos[0];
   const displayMain = mainPhoto || mainPhotoObj?.url;
   const isAuthor = user.id === r.user_id;
+  const dishTypes = toArr(r.dish_type);
+  const mealTimes = toArr(r.meal_time);
+  const dietary = toArr(r.dietary);
+
+  function tagChip(type, val, cls) {
+    return (
+      <button key={val} className={`text-[11px] px-2.5 py-1 rounded-full font-semibold border ${cls}`} onClick={() => onTagClick?.(type, val)}>
+        {val}
+      </button>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
@@ -140,27 +159,23 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
         </div>
         {r.description && <p className="text-sm text-gray-500 mb-3 leading-relaxed">{r.description}</p>}
 
-        {/* Tags row */}
-        {((r.dish_type && (Array.isArray(r.dish_type) ? r.dish_type.length > 0 : true)) ||
-          (r.meal_time && (Array.isArray(r.meal_time) ? r.meal_time.length > 0 : true)) ||
-          (r.dietary && r.dietary.length > 0) ||
-          r.cuisine ||
-          (r.tags || []).length > 0) && (
-          <div className="flex gap-1.5 flex-wrap mb-4">
-            {(Array.isArray(r.dish_type) ? r.dish_type : r.dish_type ? [r.dish_type] : []).map(dt => (
-              <span key={dt} className="text-[11px] px-2.5 py-1 rounded-full bg-brand-light text-brand font-semibold border border-brand/20">{dt}</span>
-            ))}
-            {(Array.isArray(r.meal_time) ? r.meal_time : r.meal_time ? [r.meal_time] : []).map(mt => (
-              <span key={mt} className="text-[11px] px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-100">{mt}</span>
-            ))}
-            {(r.dietary || []).map(d => (
-              <span key={d} className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">{d}</span>
-            ))}
-            {r.cuisine && (
-              <span className="text-[11px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-100">{r.cuisine}</span>
-            )}
+        {/* Category badges (clickable) */}
+        {(dishTypes.length > 0 || mealTimes.length > 0 || dietary.length > 0 || r.cuisine) && (
+          <div className="flex gap-1.5 flex-wrap mb-2">
+            {dishTypes.map(dt => tagChip('dish_type', dt, 'bg-brand-light text-brand border-brand/20'))}
+            {mealTimes.map(mt => tagChip('meal_time', mt, 'bg-amber-50 text-amber-700 border-amber-100'))}
+            {dietary.map(d => tagChip('dietary', d, 'bg-emerald-50 text-emerald-700 border-emerald-100'))}
+            {r.cuisine && tagChip('cuisine', r.cuisine, 'bg-blue-50 text-blue-700 border-blue-100')}
+          </div>
+        )}
+
+        {/* AI tags — small, italic */}
+        {(r.tags || []).length > 0 && (
+          <div className="flex gap-1 flex-wrap mb-4">
             {(r.tags || []).map(tg => (
-              <span key={tg} className="text-[11px] px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 font-semibold">{tg}</span>
+              <button key={tg} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-300 italic border border-gray-100" onClick={() => onTagClick?.('tag', tg)}>
+                {tg}
+              </button>
             ))}
           </div>
         )}
@@ -230,15 +245,22 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
         <h3 className="font-display text-lg font-bold mb-3">{t(lang, 'steps')}</h3>
         <div className="flex flex-col gap-4 mb-6">
           {(r.steps || []).map((step, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-              {step.photo_url && (
-                <img src={step.photo_url} alt="" className="w-full aspect-square object-cover cursor-pointer" onClick={() => setLightboxSrc(step.photo_url)} />
-              )}
-              <div className="flex gap-3 p-4">
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex gap-3 items-start">
                 <div className="w-8 h-8 rounded-xl bg-gray-900 text-white flex items-center justify-center font-extrabold text-sm flex-shrink-0">{i + 1}</div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   {step.title && <div className="font-bold text-sm mb-1">{step.title}</div>}
-                  <div className="text-sm text-gray-600 leading-relaxed">{step.content}</div>
+                  <div className="flex gap-3 items-start">
+                    <div className="flex-1 text-sm text-gray-600 leading-relaxed">{step.content}</div>
+                    {step.photo_url && (
+                      <img
+                        src={step.photo_url}
+                        alt=""
+                        className="w-[30%] aspect-video object-cover rounded-xl cursor-pointer flex-shrink-0"
+                        onClick={() => setLightboxSrc(step.photo_url)}
+                      />
+                    )}
+                  </div>
                   {step.timer_seconds && (
                     <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold mt-2 px-2.5 py-1 bg-brand-light rounded-lg">
                       ⏱ {fmtTimer(step.timer_seconds)}
@@ -301,7 +323,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
           function CommentRow({ c, isReply }) {
             return (
-              <div className={`bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm ${isReply ? 'ml-6 border-l-2 border-l-gray-100' : ''}`}>
+              <div className={`bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm ${isReply ? 'ml-6 border-l-2 border-l-gray-200' : ''}`}>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {c.profiles?.avatar_url ? (
                     <img src={c.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -340,8 +362,8 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
               {topLevel.map(c => (
                 <div key={c.id} className="flex flex-col gap-2">
                   <CommentRow c={c} isReply={false} />
-                  {(repliesMap[c.id] || []).map(r => (
-                    <CommentRow key={r.id} c={r} isReply={true} />
+                  {(repliesMap[c.id] || []).map(reply => (
+                    <CommentRow key={reply.id} c={reply} isReply={true} />
                   ))}
                 </div>
               ))}

@@ -5,11 +5,23 @@ import { timeAgo } from '@/lib/i18n';
 const bgColors = ['#fef9ee','#fff0f0','#f0f7ff','#fdf4ff','#f0fdfa','#f0fdf4'];
 function getBg(id) { return bgColors[Math.abs([...id].reduce((a,c)=>a+c.charCodeAt(0),0)) % bgColors.length]; }
 function isNew(createdAt) { return Date.now() - new Date(createdAt).getTime() < 3 * 24 * 60 * 60 * 1000; }
+function toArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; }
+}
 
-export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike, onFav, onShare }) {
+export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike, onFav, onShare, onTagClick }) {
   const r = recipe;
   const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
   const _isNew = isNew(r.created_at);
+  const dishTypes = toArr(r.dish_type);
+  const dietary = toArr(r.dietary);
+
+  function tagClick(type, val, e) {
+    e.stopPropagation();
+    onTagClick?.(type, val);
+  }
 
   return (
     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform" onClick={onOpen}>
@@ -30,19 +42,17 @@ export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike,
         <h3 className="font-display text-lg font-bold mb-1 leading-snug">{r.title}</h3>
         {r.description && <p className="text-xs text-gray-400 mb-2.5 line-clamp-2 leading-relaxed">{r.description}</p>}
 
-        {/* Badges */}
-        {((r.dish_type && (Array.isArray(r.dish_type) ? r.dish_type.length > 0 : true)) ||
-          (r.dietary && (r.dietary || []).length > 0) ||
-          r.cuisine) && (
+        {/* Category badges */}
+        {(dishTypes.length > 0 || dietary.length > 0 || r.cuisine) && (
           <div className="flex gap-1.5 flex-wrap mb-2.5">
-            {(Array.isArray(r.dish_type) ? r.dish_type : r.dish_type ? [r.dish_type] : []).slice(0,2).map(dt => (
-              <span key={dt} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand font-semibold border border-brand/20">{dt}</span>
+            {dishTypes.slice(0, 2).map(dt => (
+              <span key={dt} className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand font-semibold border border-brand/20 cursor-pointer" onClick={e => tagClick('dish_type', dt, e)}>{dt}</span>
             ))}
-            {(r.dietary || []).slice(0,1).map(d => (
-              <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100">{d}</span>
+            {dietary.slice(0, 1).map(d => (
+              <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100 cursor-pointer" onClick={e => tagClick('dietary', d, e)}>{d}</span>
             ))}
             {r.cuisine && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold border border-blue-100">{r.cuisine}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold border border-blue-100 cursor-pointer" onClick={e => tagClick('cuisine', r.cuisine, e)}>{r.cuisine}</span>
             )}
           </div>
         )}
@@ -60,9 +70,12 @@ export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike,
           <span>{timeAgo(r.created_at, lang)}</span>
         </div>
 
-        {(r.tags||[]).length > 0 && (
-          <div className="flex gap-1.5 flex-wrap mt-2.5">
-            {r.tags.slice(0, 4).map(tag => <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">{tag}</span>)}
+        {/* AI tags — small, italic, at bottom */}
+        {(r.tags || []).length > 0 && (
+          <div className="flex gap-1 flex-wrap mt-2">
+            {r.tags.slice(0, 4).map(tag => (
+              <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-300 italic cursor-pointer" onClick={e => tagClick('tag', tag, e)}>{tag}</span>
+            ))}
           </div>
         )}
       </div>

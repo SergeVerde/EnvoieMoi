@@ -2,6 +2,41 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { t, UNITS, DISH_TYPES, MEAL_TIMES, DIETARY_TAGS, CUISINES } from '@/lib/i18n';
+
+const KNOWN_DISH_TYPES = new Set(DISH_TYPES);
+const KNOWN_MEAL_TIMES = new Set(MEAL_TIMES);
+const KNOWN_DIETARY = new Set(DIETARY_TAGS);
+const KNOWN_CUISINES = new Set(CUISINES);
+
+function normalizeAIResult(data) {
+  const aiDishType = Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []);
+  const validDishType = aiDishType.filter(d => KNOWN_DISH_TYPES.has(d));
+  const extraDishType = aiDishType.filter(d => !KNOWN_DISH_TYPES.has(d));
+
+  const aiMealTime = Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []);
+  const validMealTime = aiMealTime.filter(m => KNOWN_MEAL_TIMES.has(m));
+  const extraMealTime = aiMealTime.filter(m => !KNOWN_MEAL_TIMES.has(m));
+
+  const aiDietary = Array.isArray(data.dietary) ? data.dietary : [];
+  const validDietary = aiDietary.filter(d => KNOWN_DIETARY.has(d));
+  const extraDietary = aiDietary.filter(d => !KNOWN_DIETARY.has(d));
+
+  const aiCuisine = data.cuisine || '';
+  const validCuisine = KNOWN_CUISINES.has(aiCuisine) ? aiCuisine : '';
+  const extraCuisine = !KNOWN_CUISINES.has(aiCuisine) && aiCuisine ? [aiCuisine] : [];
+
+  const extraTags = [...extraDishType, ...extraMealTime, ...extraDietary, ...extraCuisine];
+  const allTags = [...new Set([...(data.tags || []), ...extraTags])].filter(Boolean);
+
+  return {
+    ...data,
+    dish_type: validDishType,
+    meal_time: validMealTime,
+    dietary: validDietary,
+    cuisine: validCuisine,
+    tags: allTags,
+  };
+}
 import { resizeImage, fileToBase64 } from '@/lib/image';
 
 export default function AddRecipe({ supabase, user, profile, lang, recipeLang, canAdd, editRecipe = null, onPublished, onBack }) {
@@ -100,13 +135,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         const normalizedSteps = (data.steps || []).map(s =>
           typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
         );
-        setPrev({
-          ...data,
-          steps: normalizedSteps,
-          dish_type: Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []),
-          meal_time: Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []),
-          dietary: Array.isArray(data.dietary) ? data.dietary : [],
-        });
+        setPrev({ ...normalizeAIResult(data), steps: normalizedSteps });
         setMode('preview');
       }
     } catch (e) {
@@ -141,13 +170,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
         const normalizedSteps = (data.steps || []).map(s =>
           typeof s === 'string' ? { content: s } : { ...s, photo_url: s.photo_url || '' }
         );
-        setPrev({
-          ...data,
-          steps: normalizedSteps,
-          dish_type: Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []),
-          meal_time: Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []),
-          dietary: Array.isArray(data.dietary) ? data.dietary : [],
-        });
+        setPrev({ ...normalizeAIResult(data), steps: normalizedSteps });
         setOcrImgs([]);
         setMode('preview');
       }
@@ -576,7 +599,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           </div>
 
           <div className="flex gap-2">
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={backToManualFromPreview}>← {t(lang, 'back')}</button>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={backToManualFromPreview}>✏️ Редактировать</button>
             <button className="flex-1 py-3 rounded-xl text-sm font-bold gradient-btn text-white shadow-sm" onClick={publish} disabled={busy}>
               {isEdit ? t(lang, 'saveChanges') : t(lang, 'publish') + ' 🚀'}
             </button>

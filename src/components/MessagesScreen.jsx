@@ -7,18 +7,26 @@ export default function MessagesScreen({ supabase, user, lang, onOpenChat, onBac
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+
+    const channel = supabase
+      .channel('messages-list')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => load())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   async function load() {
-    setLoading(true);
-
-    const { data: convData } = await supabase
+    const { data: convData, error } = await supabase
       .from('conversations')
       .select('id, user1_id, user2_id, last_message_at')
       .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false });
 
-    if (!convData?.length) { setConversations([]); setLoading(false); return; }
+    if (error || !convData?.length) { setConversations([]); setLoading(false); return; }
 
     const otherIds = [...new Set(convData.map(c => c.user1_id === user.id ? c.user2_id : c.user1_id))];
 
@@ -31,17 +39,18 @@ export default function MessagesScreen({ supabase, user, lang, onOpenChat, onBac
     (profilesData || []).forEach(p => { profileMap[p.id] = p; });
 
     const withMsgs = await Promise.all(convData.map(async conv => {
+      const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
       const { data: msgs } = await supabase
         .from('messages')
         .select('text, created_at, sender_id, read_at')
         .eq('conversation_id', conv.id)
         .order('created_at', { ascending: false })
         .limit(1);
-      const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
       return { ...conv, other: profileMap[otherId], lastMessage: msgs?.[0] || null };
     }));
 
-    setConversations(withMsgs);
+    // Only show conversations that have at least one message
+    setConversations(withMsgs.filter(c => c.lastMessage));
     setLoading(false);
   }
 
@@ -90,18 +99,12 @@ export default function MessagesScreen({ supabase, user, lang, onOpenChat, onBac
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm ${unread ? 'font-extrabold' : 'font-bold'}`}>{other.display_name || other.username}</div>
                     <div className={`text-xs truncate mt-0.5 ${unread ? 'text-gray-700 font-semibold' : 'text-gray-400'}`}>
-                      {conv.lastMessage ? (
-                        <span>{conv.lastMessage.sender_id === user.id ? 'Вы: ' : ''}{conv.lastMessage.text}</span>
-                      ) : (
-                        <span className="italic">Нет сообщений</span>
-                      )}
+                      {conv.lastMessage.sender_id === user.id ? 'Вы: ' : ''}{conv.lastMessage.text}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {conv.lastMessage && (
-                      <span className="text-[10px] text-gray-400">{timeAgo(conv.lastMessage.created_at, lang)}</span>
-                    )}
-                    {unread && <span className="w-2 h-2 rounded-full bg-brand" />}
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span className="text-[10px] text-gray-400">{timeAgo(conv.lastMessage.created_at, lang)}</span>
+                    {unread && <span className="w-2.5 h-2.5 rounded-full bg-brand" />}
                   </div>
                 </button>
               );

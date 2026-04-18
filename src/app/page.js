@@ -45,6 +45,7 @@ export default function Home() {
   const [chatOtherName, setChatOtherName] = useState('');
   const [chatOtherAvatar, setChatOtherAvatar] = useState('');
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
 
   const L = settings.ui_lang;
   const canAdd = ['cook', 'admin', 'creator', 'premium'].includes(profile?.role);
@@ -189,6 +190,16 @@ export default function Home() {
     openChat(null, toUserId, toName, '');
   }
 
+  function openTagSearch(type, value) {
+    if (type === 'dish_type') setFilterDishType(value);
+    else if (type === 'meal_time') setFilterMealTime(value);
+    else if (type === 'dietary') setFilterDietary([value]);
+    else if (type === 'cuisine') setFilterCuisine(value);
+    else if (type === 'tag') setFilter(value);
+    setScreen('feed');
+    setFilterOpen(false);
+  }
+
   function handleAddClick() {
     if (canAdd) setScreen('add');
     else setGuestModal(true);
@@ -218,7 +229,10 @@ export default function Home() {
       return r.title.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q);
     }
     return true;
-  });
+  }).sort((a, b) => sortOrder === 'asc'
+    ? new Date(a.created_at) - new Date(b.created_at)
+    : new Date(b.created_at) - new Date(a.created_at)
+  );
 
   if (loading) return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center">
@@ -258,6 +272,7 @@ export default function Home() {
       onEdit={(recipeData) => { setEditRecipeData(recipeData); setScreen('edit'); }}
       onExport={(recipeData, recipePhotos) => { setExportRecipeData(recipeData); setExportPhotos(recipePhotos); setScreen('export'); }}
       onMessage={handleMessage}
+      onTagClick={(type, val) => { openTagSearch(type, val); setSelectedId(null); }}
       showToast={showToast}
     />
   );
@@ -391,6 +406,16 @@ export default function Home() {
             {search && <button className="text-gray-300 text-lg leading-none" onClick={() => setSearch('')}>✕</button>}
           </div>
           <button
+            className="w-10 h-10 rounded-2xl border border-gray-200 bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-gray-500"
+            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+            title={sortOrder === 'desc' ? 'Сначала новые' : 'Сначала старые'}
+          >
+            {sortOrder === 'desc'
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+            }
+          </button>
+          <button
             className={`w-10 h-10 rounded-2xl border flex items-center justify-center flex-shrink-0 shadow-sm ${hasFilters || filterOpen ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500'}`}
             onClick={() => setFilterOpen(o => !o)}
           >
@@ -520,6 +545,7 @@ export default function Home() {
                 onOpen={() => openRecipe(recipe.id)}
                 onLike={() => toggleLike(recipe.id)}
                 onFav={() => toggleFav(recipe.id)}
+                onTagClick={openTagSearch}
                 onShare={() => {
                   const txt = `🍽️ ${recipe.title}\n${recipe.description || ''}`;
                   if (navigator.share) navigator.share({ title: recipe.title, text: txt });
