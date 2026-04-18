@@ -391,10 +391,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
           {/* Actions */}
           <div className="flex gap-2 justify-center mt-4 flex-wrap">
             {isMe && !editing && (
-              <>
-                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white shadow-sm" onClick={startEdit}>{t(lang, 'editProfile')}</button>
-                <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white text-red-400 shadow-sm" onClick={onLogout}>{t(lang, 'logout')}</button>
-              </>
+              <button className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white shadow-sm" onClick={startEdit}>{t(lang, 'editProfile')}</button>
             )}
             {!isMe && (
               <>

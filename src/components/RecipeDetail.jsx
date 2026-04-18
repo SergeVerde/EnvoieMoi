@@ -17,7 +17,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
   const [newComment, setNewComment] = useState('');
   const [mult, setMult] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [lightboxIdx, setLightboxIdx] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const [replyTo, setReplyTo] = useState(null); // { id, username }
   const commentRef = useRef(null);
 
@@ -52,9 +52,15 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
     load();
   }
 
-  async function deleteComment(id) {
-    await supabase.from('comments').delete().eq('id', id);
-    setComments(comments.filter(c => c.id !== id));
+  async function deleteComment(c) {
+    const byMod = ['admin', 'creator'].includes(userProfile?.role) && c.user_id !== user.id;
+    await supabase.from('comments').update({
+      is_deleted: true,
+      deleted_by_role: byMod ? userProfile.role : null,
+    }).eq('id', c.id);
+    setComments(prev => prev.map(x => x.id === c.id
+      ? { ...x, is_deleted: true, deleted_by_role: byMod ? userProfile.role : null }
+      : x));
   }
 
   function canDelete(c) {
@@ -94,10 +100,10 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
   return (
     <div className="max-w-md mx-auto min-h-screen pb-6">
       {/* Lightbox */}
-      {lightboxIdx !== null && displayMain && (
-        <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center" onClick={() => setLightboxIdx(null)}>
-          <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white text-2xl z-10" onClick={() => setLightboxIdx(null)}>✕</button>
-          <img src={displayMain} alt="" className="max-w-full max-h-screen object-contain px-4" onClick={e => e.stopPropagation()} />
+      {lightboxSrc && (
+        <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center" onClick={() => setLightboxSrc(null)}>
+          <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-white text-2xl z-10" onClick={() => setLightboxSrc(null)}>✕</button>
+          <img src={lightboxSrc} alt="" className="max-w-full max-h-screen object-contain px-4" onClick={e => e.stopPropagation()} />
         </div>
       )}
 
@@ -120,13 +126,18 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
           <div
             className="h-56 rounded-3xl mb-4 bg-cover bg-center cursor-pointer shadow-sm overflow-hidden"
             style={{ backgroundImage: `url(${displayMain})` }}
-            onClick={() => setLightboxIdx(0)}
+            onClick={() => setLightboxSrc(displayMain)}
           />
         ) : (
           <div className="h-56 rounded-3xl mb-4 flex items-center justify-center text-7xl shadow-sm overflow-hidden" style={{ background: '#f0fdf4' }}>🍽️</div>
         )}
 
-        <h2 className="font-display text-2xl font-extrabold mb-1">{r.title}</h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="font-display text-2xl font-extrabold flex-1">{r.title}</h2>
+          {Date.now() - new Date(r.created_at).getTime() < 3*24*60*60*1000 && (
+            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-brand text-white tracking-wide flex-shrink-0">NEW</span>
+          )}
+        </div>
         {r.description && <p className="text-sm text-gray-500 mb-3 leading-relaxed">{r.description}</p>}
 
         {/* Tags row */}
@@ -221,7 +232,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
           {(r.steps || []).map((step, i) => (
             <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
               {step.photo_url && (
-                <img src={step.photo_url} alt="" className="w-full h-44 object-cover" />
+                <img src={step.photo_url} alt="" className="w-full aspect-square object-cover cursor-pointer" onClick={() => setLightboxSrc(step.photo_url)} />
               )}
               <div className="flex gap-3 p-4">
                 <div className="w-8 h-8 rounded-xl bg-gray-900 text-white flex items-center justify-center font-extrabold text-sm flex-shrink-0">{i + 1}</div>
@@ -247,8 +258,13 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
           </>
         )}
 
+        {/* Date */}
+        <p className="text-xs text-gray-300 text-center mb-6">
+          {new Date(r.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+
         {/* Comments */}
-        <h3 className="font-display text-lg font-bold mb-3">{t(lang, 'comments')} ({comments.length})</h3>
+        <h3 className="font-display text-lg font-bold mb-3">{t(lang, 'comments')} ({comments.filter(c => !c.is_deleted).length})</h3>
 
         {replyTo && (
           <div className="flex items-center gap-2 mb-2 px-1 text-xs text-gray-500">
@@ -285,7 +301,7 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
           function CommentRow({ c, isReply }) {
             return (
-              <div className={`bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm ${isReply ? 'ml-8 border-l-2 border-l-gray-100' : ''}`}>
+              <div className={`bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm ${isReply ? 'ml-6 border-l-2 border-l-gray-100' : ''}`}>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {c.profiles?.avatar_url ? (
                     <img src={c.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -295,20 +311,26 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
                     </div>
                   )}
                   <span className="text-xs font-bold">{c.profiles?.display_name || c.profiles?.username}</span>
-                  {c.user_id === r.user_id && (
+                  {c.user_id === r.user_id && !c.is_deleted && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-light text-brand">{t(lang, 'authorBadge')}</span>
                   )}
                   <span className="text-xs text-gray-400">{timeAgo(c.created_at, lang)}</span>
-                  <div className="ml-auto flex items-center gap-3">
-                    {!isReply && (
+                  {!c.is_deleted && (
+                    <div className="ml-auto flex items-center gap-3">
                       <button className="text-xs text-gray-400 font-semibold" onClick={() => handleReply(c)}>{t(lang, 'replyBtn')}</button>
-                    )}
-                    {canDelete(c) && (
-                      <button className="text-xs text-red-400 font-semibold" onClick={() => deleteComment(c.id)}>{t(lang, 'deleteComment')}</button>
-                    )}
-                  </div>
+                      {canDelete(c) && (
+                        <button className="text-xs text-red-400 font-semibold" onClick={() => deleteComment(c)}>{t(lang, 'deleteComment')}</button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed">{c.text}</p>
+                {c.is_deleted ? (
+                  <p className="text-sm italic text-gray-400">
+                    {c.deleted_by_role ? 'Удалено модератором' : 'Комментарий удалён'}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-600 leading-relaxed">{c.text}</p>
+                )}
               </div>
             );
           }

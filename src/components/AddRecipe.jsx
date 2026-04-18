@@ -186,6 +186,31 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
     setMS(prev => prev.map((s, i) => i === stepIdx ? { ...s, photo_url: '' } : s));
   }
 
+  function backToManualFromPreview() {
+    if (prev) {
+      setMT(prev.title || '');
+      setMDesc(prev.description || '');
+      setMI(prev.ingredients?.length > 0
+        ? prev.ingredients.map(x => ({ name: x.name || '', amount: String(x.amount || ''), unit: x.unit || 'шт' }))
+        : [{ name: '', amount: '', unit: 'шт' }]);
+      setMS(prev.steps?.length > 0
+        ? prev.steps.map(x => ({ content: x.content || '', photo_url: x.photo_url || '' }))
+        : [{ content: '' }]);
+      setMTips(prev.tips || '');
+      setMPrep(prev.prep_time || '');
+      setMCook(prev.cook_time || '');
+      setMCal(prev.calories ? String(prev.calories) : '');
+      setMCalP(prev.calories_per || 'serving');
+      setMServ(String(prev.servings || 4));
+      setMTags((prev.tags || []).join(', '));
+      setMDishTypes(Array.isArray(prev.dish_type) ? prev.dish_type : []);
+      setMMealTimes(Array.isArray(prev.meal_time) ? prev.meal_time : []);
+      setMDietary(prev.dietary || []);
+      setMCuisine(prev.cuisine || '');
+    }
+    setMode('manual');
+  }
+
   function doManual() {
     if (!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => (x.content || x).trim())) return;
     setPrev({
@@ -491,10 +516,18 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <input className="w-full mb-5 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand bg-white" value={mTags} onChange={e => setMTags(e.target.value)} placeholder="суп, курица, быстро..." />
 
           <button
-            className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold disabled:opacity-50 shadow-sm"
-            disabled={!mT.trim() || !mI.some(x => x.name.trim()) || !mS.some(x => (x.content || x).trim())}
-            onClick={doManual}
+            className="w-full py-3.5 gradient-btn text-white rounded-2xl text-sm font-bold shadow-sm"
+            onClick={() => {
+              const missing = [];
+              if (!mT.trim()) missing.push(t(lang, 'titleLabel'));
+              if (!mI.some(x => x.name.trim())) missing.push(t(lang, 'ingredients'));
+              if (!mS.some(x => (x.content || x).trim())) missing.push(t(lang, 'steps'));
+              if (missing.length) { setErr('Заполни: ' + missing.join(', ')); return; }
+              setErr('');
+              doManual();
+            }}
           >{t(lang, 'prevBtn')}</button>
+          {err && <div className="mt-2 text-xs text-red-500 font-semibold px-1">{err}</div>}
           {!isEdit && <button className="block mx-auto mt-3 text-xs text-gray-400" onClick={() => setMode('ai')}>{t(lang, 'backAI')}</button>}
         </>}
 
@@ -504,7 +537,11 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
 
           {busy && <div className="flex flex-col items-center py-4 gap-2"><div className="w-9 h-9 border-3 border-gray-200 border-t-brand rounded-full animate-spin" /><span className="text-sm text-gray-500">{bMsg}</span></div>}
 
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4 shadow-sm">
+            {(mainPhotoPreview || existingMainPhoto?.url) && (
+              <img src={mainPhotoPreview || existingMainPhoto?.url} alt="" className="w-full aspect-square object-cover" />
+            )}
+            <div className="p-4">
             <h3 className="font-display text-xl font-bold mb-2">{prev.title}</h3>
             {prev.description && <p className="text-xs text-gray-500 mb-3">{prev.description}</p>}
             <div className="flex gap-1.5 flex-wrap mb-2">
@@ -535,10 +572,11 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
               );
             })}
             {prev.tips && <div className="bg-amber-50 rounded-xl p-3 mt-3 text-xs text-amber-800">{prev.tips}</div>}
+            </div>
           </div>
 
           <div className="flex gap-2">
-            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={() => setMode('manual')}>← {t(lang, 'back')}</button>
+            <button className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#f8f7f4] border border-gray-200" onClick={backToManualFromPreview}>← {t(lang, 'back')}</button>
             <button className="flex-1 py-3 rounded-xl text-sm font-bold gradient-btn text-white shadow-sm" onClick={publish} disabled={busy}>
               {isEdit ? t(lang, 'saveChanges') : t(lang, 'publish') + ' 🚀'}
             </button>

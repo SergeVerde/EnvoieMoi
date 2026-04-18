@@ -83,26 +83,34 @@ CREATE POLICY "msg_update" ON messages FOR UPDATE
       AND (user1_id = auth.uid() OR user2_id = auth.uid())
   ));
 
--- 7. Threaded comments: add parent_id
+-- 7. Threaded comments: add parent_id + soft delete
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES comments(id) ON DELETE CASCADE;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS is_deleted boolean DEFAULT false;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS deleted_by_role text;
 
--- 8. Refresh recipes_feed view to include dietary and cuisine
--- (Only run if your view doesn't already include them)
--- Check current view definition first: SELECT definition FROM pg_views WHERE viewname = 'recipes_feed';
--- If needed, recreate:
-/*
+-- Allow users and moderators to soft-delete (update) comments
+DROP POLICY IF EXISTS "Users can soft delete comments" ON comments;
+CREATE POLICY "Users can soft delete comments" ON comments FOR UPDATE
+  USING (
+    auth.uid() = user_id OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'creator'))
+  );
+
+-- 8. Recreate recipes_feed view to include all new columns
+-- (SELECT * in views is static — must recreate after adding columns)
 CREATE OR REPLACE VIEW recipes_feed AS
 SELECT
-  r.*,
+  r.id, r.user_id, r.title, r.description, r.servings, r.prep_time, r.cook_time,
+  r.calories, r.calories_per, r.ingredients, r.steps, r.tags, r.tips, r.lang,
+  r.dish_type, r.meal_time, r.dietary, r.cuisine,
+  r.created_at, r.updated_at,
   p.username as author_username,
   p.display_name as author_name,
   p.avatar_url as author_avatar,
-  COUNT(DISTINCT l.user_id)::int as likes_count,
-  COUNT(DISTINCT c.id)::int as comments_count,
+  COALESCE(lc.cnt, 0)::int as likes_count,
+  COALESCE(cc.cnt, 0)::int as comments_count,
   (SELECT url FROM recipe_photos WHERE recipe_id = r.id AND is_main = true LIMIT 1) as main_photo_url
 FROM recipes r
-LEFT JOIN profiles p ON p.id = r.user_id
-LEFT JOIN likes l ON l.recipe_id = r.id
-LEFT JOIN comments c ON c.recipe_id = r.id
-GROUP BY r.id, p.username, p.display_name, p.avatar_url;
-*/
+JOIN profiles p ON p.id = r.user_id
+LEFT JOIN (SELECT recipe_id, COUNT(*) as cnt FROM likes GROUP BY recipe_id) lc ON lc.recipe_id = r.id
+LEFT JOIN (SELECT recipe_id, COUNT(*) as cnt FROM comments GROUP BY recipe_id) cc ON cc.recipe_id = r.id;

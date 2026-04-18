@@ -95,11 +95,12 @@ export default function ChatScreen({ supabase, user, conversationId, otherUserId
     if (!text.trim() || !cid) return;
     const msg = text.trim();
     setText('');
-    await supabase.from('messages').insert({
+    const { data: newMsg } = await supabase.from('messages').insert({
       conversation_id: cid,
       sender_id: user.id,
       text: msg,
-    });
+    }).select().single();
+    if (newMsg) setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
     await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', cid);
   }
 

@@ -35,7 +35,7 @@ export async function POST(request) {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat-v3-0324',
+        model: images?.length > 0 ? 'google/gemini-flash-1.5' : 'deepseek/deepseek-chat-v3-0324',
         messages: [
           { role: 'system', content: buildSystem(lang || 'ru') },
           ...messages,

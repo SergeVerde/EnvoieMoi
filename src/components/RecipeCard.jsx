@@ -2,25 +2,28 @@
 
 import { timeAgo } from '@/lib/i18n';
 
-const tagEmoji = {мясо:'🥩',курица:'🍗',рыба:'🐟',суп:'🍲',салат:'🥗',паста:'🍝',десерт:'🍰',выпечка:'🧁',завтрак:'🍳',напиток:'🥤',вегетарианское:'🌿',острое:'🌶️',быстрое:'⚡',meat:'🥩',chicken:'🍗',fish:'🐟',soup:'🍲',salad:'🥗',dessert:'🍰',breakfast:'🍳',spicy:'🌶️',quick:'⚡'};
-function getEmoji(tags) { for (const t of (tags||[])) { const l=t.toLowerCase(); for (const[k,v] of Object.entries(tagEmoji)) if(l.includes(k)) return v; } return '🍽️'; }
-const bgColors = ['#f0fdf4','#fef9ee','#fff0f0','#f0f7ff','#fdf4ff','#f0fdfa'];
+const bgColors = ['#fef9ee','#fff0f0','#f0f7ff','#fdf4ff','#f0fdfa','#f0fdf4'];
 function getBg(id) { return bgColors[Math.abs([...id].reduce((a,c)=>a+c.charCodeAt(0),0)) % bgColors.length]; }
+function isNew(createdAt) { return Date.now() - new Date(createdAt).getTime() < 3 * 24 * 60 * 60 * 1000; }
 
 export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike, onFav, onShare }) {
   const r = recipe;
   const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+  const _isNew = isNew(r.created_at);
 
   return (
     <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform" onClick={onOpen}>
-      {/* Hero */}
-      {r.main_photo_url ? (
-        <div className="h-44 bg-cover bg-center" style={{ backgroundImage: `url(${r.main_photo_url})` }} />
-      ) : (
-        <div className="h-44 flex items-center justify-center text-6xl" style={{ background: getBg(r.id) }}>
-          {getEmoji(r.tags)}
-        </div>
-      )}
+      {/* Hero — square */}
+      <div className="relative">
+        {r.main_photo_url ? (
+          <div className="aspect-square w-full bg-cover bg-center" style={{ backgroundImage: `url(${r.main_photo_url})` }} />
+        ) : (
+          <div className="aspect-square w-full flex items-center justify-center text-5xl" style={{ background: getBg(r.id) }} />
+        )}
+        {_isNew && (
+          <span className="absolute top-2 left-2 text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-brand text-white shadow-sm tracking-wide">NEW</span>
+        )}
+      </div>
 
       {/* Body */}
       <div className="p-4 pb-2">

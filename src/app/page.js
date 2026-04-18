@@ -293,7 +293,7 @@ export default function Home() {
       lang={L}
       recipeLang={settings.recipe_lang}
       canAdd={canAdd}
-      onPublished={() => { loadRecipes(); setScreen('feed'); showToast(t(L, 'published')); }}
+      onPublished={() => { loadRecipes(); openProfile(user.id); showToast(t(L, 'published')); }}
       onBack={() => setScreen('feed')}
     />
   );
@@ -323,6 +323,7 @@ export default function Home() {
       lang={L}
       onBack={() => setScreen('profile')}
       onUpdate={(s) => setSettings(s)}
+      onLogout={async () => { await supabase.auth.signOut(); setUser(null); setProfile(null); }}
     />
   );
 
