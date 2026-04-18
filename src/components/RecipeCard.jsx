@@ -5,10 +5,29 @@ import { timeAgo } from '@/lib/i18n';
 const bgColors = ['#fef9ee','#fff0f0','#f0f7ff','#fdf4ff','#f0fdfa','#f0fdf4'];
 function getBg(id) { return bgColors[Math.abs([...id].reduce((a,c)=>a+c.charCodeAt(0),0)) % bgColors.length]; }
 function isNew(createdAt) { return Date.now() - new Date(createdAt).getTime() < 3 * 24 * 60 * 60 * 1000; }
+function cleanStr(s) {
+  return String(s).trim().replace(/^["']+|["']+$/g, '').trim();
+}
 function toArr(v) {
   if (!v) return [];
-  if (Array.isArray(v)) return v;
-  try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; }
+  if (Array.isArray(v)) {
+    return v.flatMap(el => {
+      const s = cleanStr(el);
+      if (s.startsWith('[')) { try { const p = JSON.parse(s); return Array.isArray(p) ? p.map(cleanStr) : [s]; } catch {} }
+      return s ? [s] : [];
+    });
+  }
+  const s = String(v).trim();
+  try {
+    const p = JSON.parse(s);
+    if (Array.isArray(p)) return p.flatMap(el => {
+      const es = cleanStr(el);
+      if (es.startsWith('[')) { try { const p2 = JSON.parse(es); return Array.isArray(p2) ? p2.map(cleanStr) : [es]; } catch {} }
+      return es ? [es] : [];
+    });
+    if (typeof p === 'string') return p ? [p] : [];
+  } catch {}
+  return s ? [s] : [];
 }
 
 export default function RecipeCard({ recipe, lang, liked, faved, onOpen, onLike, onFav, onShare, onTagClick }) {

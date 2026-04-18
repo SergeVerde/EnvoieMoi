@@ -106,9 +106,7 @@ export default function AuthScreen({ supabase }) {
     return (
       <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
         <div className="text-center w-full">
-          <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand/20">
-            <span className="text-2xl">🌿</span>
-          </div>
+          <img src="/logo2.svg" alt="" className="w-14 h-14 mx-auto mb-5" />
           <h1 className="font-display text-2xl font-extrabold gradient-text mb-1">Сброс пароля</h1>
           <p className="text-gray-400 text-sm mb-8">Введи свой email — пришлём ссылку для сброса</p>
 
@@ -136,10 +134,8 @@ export default function AuthScreen({ supabase }) {
   return (
     <div className="max-w-md mx-auto min-h-screen flex items-center justify-center px-5">
       <div className="text-center w-full">
-        <div className="w-16 h-16 rounded-2xl gradient-btn flex items-center justify-center mx-auto mb-5 shadow-lg shadow-brand/20">
-          <span className="text-2xl">🌿</span>
-        </div>
-        <h1 className="font-display text-3xl font-extrabold gradient-text mb-1">Pestogram</h1>
+        <img src="/logo2.svg" alt="" className="w-16 h-16 mx-auto mb-5" />
+        <img src="/logo.svg" alt="Pestogram" className="h-8 mx-auto mb-1" />
         <p className="text-gray-400 text-sm mb-8">Социальная сеть рецептов</p>
 
         <div className="max-w-xs mx-auto space-y-3">

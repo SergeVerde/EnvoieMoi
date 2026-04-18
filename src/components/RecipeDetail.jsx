@@ -9,10 +9,29 @@ function fmtTimer(s) {
   return s + ' сек';
 }
 
+function cleanStr(s) {
+  return String(s).trim().replace(/^["']+|["']+$/g, '').trim();
+}
 function toArr(v) {
   if (!v) return [];
-  if (Array.isArray(v)) return v;
-  try { const p = JSON.parse(v); return Array.isArray(p) ? p : [String(v)]; } catch { return [String(v)]; }
+  if (Array.isArray(v)) {
+    return v.flatMap(el => {
+      const s = cleanStr(el);
+      if (s.startsWith('[')) { try { const p = JSON.parse(s); return Array.isArray(p) ? p.map(cleanStr) : [s]; } catch {} }
+      return s ? [s] : [];
+    });
+  }
+  const s = String(v).trim();
+  try {
+    const p = JSON.parse(s);
+    if (Array.isArray(p)) return p.flatMap(el => {
+      const es = cleanStr(el);
+      if (es.startsWith('[')) { try { const p2 = JSON.parse(es); return Array.isArray(p2) ? p2.map(cleanStr) : [es]; } catch {} }
+      return es ? [es] : [];
+    });
+    if (typeof p === 'string') return p ? [p] : [];
+  } catch {}
+  return s ? [s] : [];
 }
 
 export default function RecipeDetail({ recipeId, supabase, user, userProfile, lang, liked, faved, onLike, onFav, onBack, onOpenProfile, onEdit, onExport, onMessage, onTagClick, showToast }) {
@@ -153,6 +172,8 @@ export default function RecipeDetail({ recipeId, supabase, user, userProfile, la
 
         <div className="flex items-center gap-2 mb-1">
           <h2 className="font-display text-2xl font-extrabold flex-1">{r.title}</h2>
+          {r.visibility === 'followers' && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">👥</span>}
+          {r.visibility === 'private' && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">🔒</span>}
           {Date.now() - new Date(r.created_at).getTime() < 3*24*60*60*1000 && (
             <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-brand text-white tracking-wide flex-shrink-0">NEW</span>
           )}

@@ -80,7 +80,7 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
     ]);
 
     setProf(profRes.data);
-    setRecipes(recipesRes.data || []);
+    const allRecipes = recipesRes.data || [];
     setFollowersCount(followersRes.count || 0);
     setFollowingCount(followingRes.count || 0);
 
@@ -89,8 +89,18 @@ export default function ProfileView({ supabase, userId, currentUser, profile: my
         supabase.from('follows').select('follower_id').eq('follower_id', currentUser.id).eq('following_id', userId).maybeSingle(),
         supabase.from('blocks').select('blocker_id').eq('blocker_id', currentUser.id).eq('blocked_id', userId).maybeSingle(),
       ]);
-      setIsFollowing(!!followRes.data);
+      const following = !!followRes.data;
+      setIsFollowing(following);
       setIsBlocked(!!blockRes.data);
+      const canSeeAll = ['admin', 'creator'].includes(myProfile?.role);
+      setRecipes(allRecipes.filter(r => {
+        if (!r.visibility || r.visibility === 'public') return true;
+        if (r.visibility === 'followers') return following || canSeeAll;
+        if (r.visibility === 'private') return canSeeAll;
+        return false;
+      }));
+    } else {
+      setRecipes(allRecipes);
     }
     setLoading(false);
   }

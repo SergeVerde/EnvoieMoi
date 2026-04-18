@@ -141,14 +141,19 @@ DROP POLICY IF EXISTS "blocks_delete" ON blocks;
 CREATE POLICY "blocks_delete" ON blocks FOR DELETE
   USING (auth.uid() = blocker_id);
 
--- 11. Recreate recipes_feed view to include all new columns
+-- 11. Add visibility to recipes
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS visibility text DEFAULT 'public';
+ALTER TABLE recipes DROP CONSTRAINT IF EXISTS recipes_visibility_check;
+ALTER TABLE recipes ADD CONSTRAINT recipes_visibility_check CHECK (visibility IN ('public', 'followers', 'private'));
+
+-- 12. Recreate recipes_feed view to include all new columns
 -- (SELECT * in views is static -- must recreate after adding columns)
 DROP VIEW IF EXISTS recipes_feed;
 CREATE VIEW recipes_feed AS
 SELECT
   r.id, r.user_id, r.title, r.description, r.servings, r.prep_time, r.cook_time,
   r.calories, r.calories_per, r.ingredients, r.steps, r.tags, r.tips, r.lang,
-  r.dish_type, r.meal_time, r.dietary, r.cuisine,
+  r.dish_type, r.meal_time, r.dietary, r.cuisine, r.visibility,
   r.created_at, r.updated_at,
   p.username as author_username,
   p.display_name as author_name,

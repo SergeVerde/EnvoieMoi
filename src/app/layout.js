@@ -3,6 +3,10 @@ import './globals.css';
 export const metadata = {
   title: 'Pestogram',
   description: 'Социальная сеть рецептов',
+  icons: {
+    icon: '/logo2.svg',
+    apple: '/logo2.svg',
+  },
 };
 
 export default function RootLayout({ children }) {

@@ -45,6 +45,7 @@ export default function Home() {
   const [chatOtherName, setChatOtherName] = useState('');
   const [chatOtherAvatar, setChatOtherAvatar] = useState('');
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [followingIds, setFollowingIds] = useState([]);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
   const [headerHidden, setHeaderHidden] = useState(false);
   const lastScrollY = useRef(0);
@@ -131,11 +132,12 @@ export default function Home() {
   }, [search]);
 
   async function loadUserData(userId) {
-    const [profileRes, settingsRes, favsRes, likesRes] = await Promise.all([
+    const [profileRes, settingsRes, favsRes, likesRes, followsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).single(),
       supabase.from('user_settings').select('*').eq('user_id', userId).single(),
       supabase.from('favorites').select('recipe_id').eq('user_id', userId),
       supabase.from('likes').select('recipe_id').eq('user_id', userId),
+      supabase.from('follows').select('following_id').eq('follower_id', userId),
     ]);
 
     if (profileRes.data) setProfile(profileRes.data);
@@ -155,6 +157,7 @@ export default function Home() {
     if (settingsRes.data) setSettings(settingsRes.data);
     setFavIds((favsRes.data || []).map(f => f.recipe_id));
     setLikeIds((likesRes.data || []).map(l => l.recipe_id));
+    setFollowingIds((followsRes.data || []).map(f => f.following_id));
 
     await loadRecipes();
     loadUnreadCount(userId);
@@ -241,7 +244,15 @@ export default function Home() {
   const hasFilters = filterDishType || filterMealTime || filterDietary.length > 0 || filterCuisine;
   const allTags = [...new Set(recipes.flatMap(r => r.tags || []))];
 
+  const isAdminOrCreator = ['admin', 'creator'].includes(profile?.role);
+
   const filtered = recipes.filter(r => {
+    // Visibility filter
+    if (r.visibility === 'private') {
+      if (r.user_id !== user?.id && !isAdminOrCreator) return false;
+    } else if (r.visibility === 'followers') {
+      if (r.user_id !== user?.id && !followingIds.includes(r.user_id) && !isAdminOrCreator) return false;
+    }
     if (screen === 'favorites' && !favIds.includes(r.id)) return false;
     if (filter && !(r.tags || []).includes(filter)) return false;
     if (filterDishType) {
@@ -428,12 +439,7 @@ export default function Home() {
       {/* Sticky header: logo + search + filters */}
       <div className={`sticky top-0 z-50 bg-[#f8f7f4]/95 backdrop-blur border-b border-gray-100 transition-transform duration-300 ${headerHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg gradient-btn flex items-center justify-center shadow-sm">
-              <span className="text-sm">🌿</span>
-            </div>
-            <h1 className="font-display text-xl font-extrabold gradient-text">Pestogram</h1>
-          </div>
+          <img src="/logo.svg" alt="Pestogram" className="h-7" />
         </div>
         <div className="px-5 pb-3">
           <div className="flex gap-2">

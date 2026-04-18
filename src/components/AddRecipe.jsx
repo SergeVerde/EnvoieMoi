@@ -8,12 +8,20 @@ const KNOWN_MEAL_TIMES = new Set(MEAL_TIMES);
 const KNOWN_DIETARY = new Set(DIETARY_TAGS);
 const KNOWN_CUISINES = new Set(CUISINES);
 
+function tryParseArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map(x => String(x).trim().replace(/^["']+|["']+$/g, '').trim()).filter(Boolean);
+  const s = String(v).trim();
+  try { const p = JSON.parse(s); return Array.isArray(p) ? p.map(x => String(x).trim().replace(/^["']+|["']+$/g, '').trim()).filter(Boolean) : (p ? [String(p)] : []); } catch {}
+  return s ? [s] : [];
+}
+
 function normalizeAIResult(data) {
-  const aiDishType = Array.isArray(data.dish_type) ? data.dish_type : (data.dish_type ? [data.dish_type] : []);
+  const aiDishType = tryParseArr(data.dish_type);
   const validDishType = aiDishType.filter(d => KNOWN_DISH_TYPES.has(d));
   const extraDishType = aiDishType.filter(d => !KNOWN_DISH_TYPES.has(d));
 
-  const aiMealTime = Array.isArray(data.meal_time) ? data.meal_time : (data.meal_time ? [data.meal_time] : []);
+  const aiMealTime = tryParseArr(data.meal_time);
   const validMealTime = aiMealTime.filter(m => KNOWN_MEAL_TIMES.has(m));
   const extraMealTime = aiMealTime.filter(m => !KNOWN_MEAL_TIMES.has(m));
 
@@ -65,6 +73,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
   const [mMealTimes, setMMealTimes] = useState([]);
   const [mDietary, setMDietary] = useState([]);
   const [mCuisine, setMCuisine] = useState('');
+  const [mVisibility, setMVisibility] = useState('public');
 
   // Main photo (single)
   const [mainPhotoFile, setMainPhotoFile] = useState(null);
@@ -102,6 +111,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       setMMealTimes(Array.isArray(mt) ? mt : (mt ? [mt] : []));
       setMDietary(editRecipe.dietary || []);
       setMCuisine(editRecipe.cuisine || '');
+      setMVisibility(editRecipe.visibility || 'public');
       if (editRecipe.id) {
         supabase.from('recipe_photos').select('*').eq('recipe_id', editRecipe.id).eq('is_main', true).maybeSingle()
           .then(({ data }) => { if (data) setExistingMainPhoto(data); });
@@ -230,6 +240,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       setMMealTimes(Array.isArray(prev.meal_time) ? prev.meal_time : []);
       setMDietary(prev.dietary || []);
       setMCuisine(prev.cuisine || '');
+      setMVisibility(prev.visibility || 'public');
     }
     setMode('manual');
   }
@@ -249,6 +260,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       meal_time: mMealTimes.length > 0 ? mMealTimes : null,
       dietary: mDietary.length > 0 ? mDietary : [],
       cuisine: mCuisine || '',
+      visibility: mVisibility,
       ingredients: mI.filter(x => x.name.trim()).map(x => ({ name: x.name.trim(), amount: parseFloat(x.amount) || 0, unit: x.unit })),
       steps: mS.filter(x => (x.content || x).trim()).map((x, origIdx) => ({
         title: '',
@@ -280,6 +292,7 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
       meal_time: prev.meal_time || null,
       dietary: prev.dietary || [],
       cuisine: prev.cuisine || '',
+      visibility: prev.visibility || 'public',
     };
 
     // Upload step photos first
@@ -451,6 +464,20 @@ export default function AddRecipe({ supabase, user, profile, lang, recipeLang, c
           <div className="flex gap-1.5 flex-wrap mb-3">
             {MEAL_TIMES.map(mt => (
               <button key={mt} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${mMealTimes.includes(mt) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => toggleArr(setMMealTimes, mt)}>{mt}</button>
+            ))}
+          </div>
+
+          <label className="text-xs font-bold text-gray-500 mb-1 block">Видимость рецепта</label>
+          <div className="flex gap-1.5 mb-3">
+            {[
+              { key: 'public', icon: '🌍', label: 'Для всех' },
+              { key: 'followers', icon: '👥', label: 'Подписчики' },
+              { key: 'private', icon: '🔒', label: 'Только я' },
+            ].map(opt => (
+              <button key={opt.key} className={`flex-1 py-2 rounded-xl border text-xs font-semibold flex flex-col items-center gap-0.5 ${mVisibility === opt.key ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'}`} onClick={() => setMVisibility(opt.key)}>
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
+              </button>
             ))}
           </div>
 
